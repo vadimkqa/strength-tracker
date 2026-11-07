@@ -768,3 +768,205 @@ nav button.active svg {
 .card-footer b svg {
   vertical-align: middle;
 }
+/* Centered, circular card rail: native touch scrolling, pointer-driven mouse drag. */
+.carousel-shell {
+  position: relative;
+  margin: 0 -24px;
+}
+.carousel-shell .carousel {
+  margin: 0;
+  padding: 0;
+  scroll-padding: 0;
+  gap: 16px;
+  scroll-snap-type: x mandatory;
+  cursor: grab;
+  user-select: none;
+  overscroll-behavior-x: contain;
+}
+.carousel-shell .carousel:before,
+.carousel-shell .carousel:after {
+  content: '';
+  flex: 0 0 22px;
+}
+.carousel-shell .workout-card {
+  flex: 0 0 calc(100% - 76px);
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  opacity: 0.72;
+  transition:
+    opacity 0.18s ease,
+    border-color 0.18s ease;
+}
+.carousel-shell .workout-card.selected {
+  opacity: 1;
+  border-color: #8152a8;
+}
+.carousel-shell .photo img {
+  filter: saturate(0.55) brightness(0.83);
+  pointer-events: none;
+}
+.carousel-shell .dragging {
+  cursor: grabbing;
+  scroll-snap-type: none;
+}
+.carousel-arrows {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin: 12px 0 0;
+}
+.carousel-arrows button {
+  min-width: 44px;
+  padding: 6px 10px;
+  background: transparent;
+  border-color: #382a43;
+  font-size: 20px;
+  line-height: 1;
+}
+.carousel-arrows span {
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: var(--muted);
+}
+textarea {
+  font: inherit;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+  background: #100b16;
+  border: 1px solid #42314f;
+  color: #f5f1fa;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+textarea:focus-visible {
+  outline: 2px solid var(--highlight);
+  outline-offset: 3px;
+}
+.plan-importer {
+  overflow-wrap: anywhere;
+}
+.plan-importer pre {
+  font: inherit;
+  font-size: 12px;
+  white-space: pre-wrap;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.plan-importer details {
+  margin-bottom: 16px;
+}
+.import-row {
+  min-width: 0;
+  border: 1px solid #4a345b;
+  border-radius: 14px;
+  margin: 22px 0;
+  padding: 15px;
+}
+.import-row legend {
+  font-size: 12px;
+  color: var(--highlight);
+  padding: 0 5px;
+}
+.import-row.excluded {
+  border-style: dashed;
+  opacity: 0.65;
+}
+.import-row > details {
+  margin-top: 0;
+}
+.checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12px;
+  letter-spacing: 0;
+  line-height: 1.6;
+  text-transform: none;
+  cursor: pointer;
+  color: #d8cce3;
+}
+.checkbox-label input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  flex: 0 0 20px;
+  accent-color: var(--purple);
+  margin: 0;
+}
+.import-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+.import-grid select {
+  font-size: 12px;
+  padding: 8px;
+}
+.import-grid input[type='number'] {
+  text-align: left;
+}
+.parser-notices,
+.import-warning {
+  font-size: 12px;
+  color: #e4bd94;
+  line-height: 1.7;
+  padding-left: 18px;
+}
+p.import-warning {
+  padding-left: 0;
+}
+.import-success {
+  font-size: 13px;
+  color: #beabcf;
+  line-height: 1.7;
+}
+.import-summary {
+  background: var(--raised);
+  border-radius: 12px;
+  padding: 15px;
+  margin-top: 18px;
+}
+.import-summary ul {
+  font-size: 12px;
+  line-height: 1.8;
+  padding-left: 18px;
+  color: #e1d6eb;
+}
+.import-row .row button {
+  font-size: 11px;
+  padding: 8px;
+}
+.prescription {
+  color: var(--highlight);
+}
+.prescription-notes p {
+  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+@media (max-width: 360px) {
+  .carousel-shell {
+    margin: 0 -18px;
+  }
+  .carousel-shell .workout-card {
+    flex-basis: calc(100% - 64px);
+  }
+  .carousel-shell .carousel:before,
+  .carousel-shell .carousel:after {
+    flex-basis: 16px;
+  }
+  .import-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .carousel-shell .workout-card {
+    transition: none;
+  }
+}

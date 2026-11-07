@@ -1,3 +1,4 @@
+import { saveImportedPlan } from './plan-storage';
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
@@ -12,38 +13,13 @@ import {
   type Data,
   type Workout,
 } from './data';
+import { workouts, templateLabel } from './workouts';
+import { WorkoutCarousel, type CarouselHandle } from './WorkoutCarousel';
+import { PlanImporter } from './PlanImporter';
+import type { PlanDraft } from './plan-import';
 import './style.css';
-const cards = [
-  {
-    name: 'Bench Day',
-    key: 'Tuesday · Bench focus',
-    muscles: 'CHEST · ARMS · CORE',
-    photo: 'bench',
-    caption: 'Bench press',
-  },
-  {
-    name: 'DB Press Day',
-    key: 'Thursday · Back focus',
-    muscles: 'BACK · SHOULDERS · ARMS',
-    photo: 'pullups',
-    caption: 'Pull-up bar',
-  },
-  {
-    name: 'Hammer Press Day',
-    key: 'Saturday · Chest focus',
-    muscles: 'CHEST · SHOULDERS · TRICEPS',
-    photo: 'hammer',
-    caption: 'Hammer-style chest press machine',
-  },
-  {
-    name: 'Leg Day',
-    key: 'Sunday · Legs',
-    muscles: 'QUADS · GLUTES · CALVES',
-    photo: 'legs',
-    caption: 'Leg press machine',
-  },
-];
-const label = (name: string) => cards.find((c) => c.key === name)?.name || name;
+const cards = workouts;
+const label = templateLabel;
 type Tab = 'Train' | 'Progress' | 'PRs' | 'Settings';
 function Icon({ name }: { name: Tab }) {
   const paths = {
@@ -92,11 +68,11 @@ function App() {
     [fatal, setFatal] = useState(''),
     [pending, setPending] = useState(0),
     [restoring, setRestoring] = useState(false),
-    [planKey, setPlanKey] = useState(cards[0].key);
+    [planKey, setPlanKey] = useState<string>(cards[0].key);
   const current = useRef<Data | null>(null),
     queue = useRef(Promise.resolve()),
-    carousel = useRef<HTMLDivElement>(null),
-    importing = useRef(false);
+    importing = useRef(false),
+    carousel = useRef<CarouselHandle>(null);
   useEffect(() => {
     let alive = true;
     let release: (() => void) | undefined;
@@ -199,12 +175,20 @@ function App() {
       setRestoring(false);
     }
   }
-  function scrollToCard(i: number) {
-    carousel.current?.children[i]?.scrollIntoView({
-      behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
-      block: 'nearest',
-      inline: 'center',
-    });
+  async function applyPlan(draft: PlanDraft) {
+    if (!current.current || importing.current) throw Error('Wait for the current save to finish.');
+    importing.current = true;
+    setRestoring(true);
+    try {
+      await queue.current;
+      const next = await saveImportedPlan(current.current, draft, true);
+      current.current = next;
+      setData(next);
+      setError('');
+    } finally {
+      importing.current = false;
+      setRestoring(false);
+    }
   }
   if (fatal)
     return (
@@ -285,65 +269,13 @@ function App() {
                   <h2>Your workout</h2>
                   <span>{String(index + 1).padStart(2, '0')} / 04</span>
                 </div>
-                <div
-                  className="carousel"
+                <WorkoutCarousel
                   ref={carousel}
-                  aria-label="Workout selection"
-                  onScroll={(e) => {
-                    const el = e.currentTarget;
-                    const children = Array.from(el.children) as HTMLElement[];
-                    let nearest = 0;
-                    let distance = Infinity;
-                    children.forEach((child, i) => {
-                      const delta = Math.abs(child.offsetLeft - el.offsetLeft - el.scrollLeft);
-                      if (delta < distance) {
-                        nearest = i;
-                        distance = delta;
-                      }
-                    });
-                    setIndex(nearest);
-                  }}
-                >
-                  {cards.map((c, i) => (
-                    <article
-                      key={c.name}
-                      className={`workout-card ${index === i ? 'selected' : ''}`}
-                      aria-label={c.name}
-                    >
-                      <div className="photo">
-                        <img
-                          src={`${import.meta.env.BASE_URL}photos/${c.photo}.jpg`}
-                          alt={c.caption}
-                        />
-                        <span className="photo-number">
-                          0{i + 1} <span>/ TRAINING SPLIT</span>
-                        </span>
-                      </div>
-                      <div className="card-caption">
-                        <p className="eyebrow">{c.muscles}</p>
-                        <h2>{c.name}</h2>
-                        <div className="card-footer">
-                          <span>{(data.plan[c.key] || []).length} exercises</span>
-                          <span>
-                            Strength & conditioning{' '}
-                            <b aria-hidden="true">
-                              <svg
-                                viewBox="0 0 20 20"
-                                width="16"
-                                height="16"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.4"
-                              >
-                                <path d="M5 15 15 5M5 5h10v10" />
-                              </svg>
-                            </b>
-                          </span>
-                        </div>
-                      </div>
-                    </article>
-                  ))}
-                </div>
+                  selected={index}
+                  onSelect={setIndex}
+                  plan={data.plan}
+                  week={data.week}
+                />
                 <div className="intensity">
                   <span className="eyebrow">TRAINING INTENSITY</span>
                   <div className="segmented" role="group" aria-label="Training intensity">
@@ -377,7 +309,7 @@ function App() {
                       aria-label={`Select ${c.name}`}
                       aria-current={index === i ? 'true' : undefined}
                       className={index === i ? 'selected' : ''}
-                      onClick={() => scrollToCard(i)}
+                      onClick={() => carousel.current?.select(i)}
                     />
                   ))}
                 </div>
@@ -507,6 +439,15 @@ function App() {
                           Edit
                         </button>
                       </div>
+                      {ex.targetReps && (
+                        <p className="muted prescription">Target: {ex.targetReps} reps</p>
+                      )}
+                      {ex.notes && (
+                        <details className="prescription-notes">
+                          <summary>Plan notes</summary>
+                          <p>{ex.notes}</p>
+                        </details>
+                      )}
                       <div className="setrow set-head">
                         <span>SET</span>
                         <span>KG</span>
@@ -722,6 +663,7 @@ function App() {
               <h1>Settings.</h1>
               <p>A plan that moves with you.</p>
             </div>
+            <PlanImporter onApply={applyPlan} />
             <section className="card">
               <h2>Workout plan</h2>
               <p className="muted">Set counts apply to future workouts.</p>

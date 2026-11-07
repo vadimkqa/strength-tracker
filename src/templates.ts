@@ -1,4 +1,11 @@
-export type Plan = Record<string, [string, number, number][]>;
+export interface Prescription {
+  reps: string;
+  notes: string;
+  category: string;
+  source: string;
+}
+export type PlanExercise = [name: string, sets: number, rest: number, prescription?: Prescription];
+export type Plan = Record<string, PlanExercise[]>;
 export const templates: Plan = {
   'Tuesday · Bench focus': [
     ['Bench Press', 4, 180],

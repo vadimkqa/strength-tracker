@@ -39,7 +39,15 @@ test('mobile home, all workout selections, visible intensity and small-screen la
     'aria-pressed',
     'true',
   );
-  await expect.poll(() => page.locator('.carousel').evaluate((e) => e.scrollLeft)).toBeLessThan(2);
+  await expect
+    .poll(() =>
+      page
+        .getByRole('article', { name: 'Bench Day', exact: true })
+        .evaluate((e) =>
+          Math.abs(e.getBoundingClientRect().left + e.clientWidth / 2 - innerWidth / 2),
+        ),
+    )
+    .toBeLessThan(3);
   await page.screenshot({ path: 'test-results/train-390.png', fullPage: true });
   await page.setViewportSize({ width: 320, height: 568 });
   await expect(page.getByRole('button', { name: 'START WORKOUT' })).toBeVisible();

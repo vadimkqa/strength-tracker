@@ -1,4 +1,5 @@
 import { openDB } from 'idb';
+import { templateKey } from './workouts';
 import { defaultPlan, type Plan } from './templates';
 export const LEGACY_KEY = 'strength-tracker-v1';
 export interface SetEntry {
@@ -10,6 +11,8 @@ export interface Exercise {
   id: string;
   name: string;
   rest: number;
+  targetReps?: string;
+  notes?: string;
   sets: SetEntry[];
 }
 export interface Workout {
@@ -178,7 +181,7 @@ export async function restoreBackup(current: Data, input: unknown, name?: string
 export const newSet = (): SetEntry => ({ weight: '', reps: '', done: false });
 export function createWorkout(name: string, week: string, plan: Plan, now = Date.now()): Workout {
   const keys = Object.keys(defaultPlan());
-  const key = name === 'Sunday · Legs' && week === 'easy' ? 'Sunday · Legs · Easy' : name;
+  const key = templateKey(name, week);
   return {
     id: crypto.randomUUID(),
     name,
@@ -186,14 +189,19 @@ export function createWorkout(name: string, week: string, plan: Plan, now = Date
     started: now,
     restEnd: null,
     restSeconds: null,
-    exercises: (plan[key] || defaultPlan()[key] || defaultPlan()[keys[0]]).map(
-      ([name, count, rest]) => ({
-        id: crypto.randomUUID(),
-        name,
-        rest,
-        sets: Array.from({ length: count }, newSet),
-      }),
-    ),
+    exercises: (
+      plan[key] ||
+      plan[name] ||
+      defaultPlan()[key] ||
+      defaultPlan()[name] ||
+      defaultPlan()[keys[0]]
+    ).map(([name, count, rest, prescription]) => ({
+      id: crypto.randomUUID(),
+      name,
+      rest,
+      ...(prescription ? { targetReps: prescription.reps, notes: prescription.notes } : {}),
+      sets: Array.from({ length: count }, newSet),
+    })),
   };
 }
 export function completeSet(workout: Workout, i: number, j: number, now = Date.now()): Workout {
