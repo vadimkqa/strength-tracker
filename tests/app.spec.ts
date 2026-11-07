@@ -87,6 +87,7 @@ test('legacy history migrates, workout persists, timer and logging, history and 
   await expect(page.getByRole('heading', { name: 'Bench Day', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Train', exact: true }).click();
   await page.getByRole('button', { name: 'START WORKOUT' }).click();
+  await page.getByRole('spinbutton', { name: 'Reps Bench Press set 1', exact: true }).fill('0');
   await page.getByRole('button', { name: 'Complete Bench Press set 1', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('positive whole-number reps');
   await page.getByRole('spinbutton', { name: 'Weight Bench Press set 1', exact: true }).fill('60');

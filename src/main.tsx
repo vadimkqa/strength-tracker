@@ -1,3 +1,4 @@
+import { exerciseIdentity, addPerformanceSet, setNumber } from './performance';
 import { repsLabel } from './prescriptions';
 import { saveImportedPlan } from './plan-storage';
 import { useEffect, useRef, useState } from 'react';
@@ -357,8 +358,10 @@ function App() {
                             rotationSession.key,
                             rotationSession.intensity === 'hard' ? 'heavy' : 'easy',
                             d.plan,
+                            Date.now(),
+                            d.history,
                           )
-                        : createWorkout(cards[index].key, d.week, d.plan),
+                        : createWorkout(cards[index].key, d.week, d.plan, Date.now(), d.history),
                     }))
                   }
                 >
@@ -471,21 +474,13 @@ function App() {
                   </button>
                 </div>
                 {active.exercises.map((ex, i) => {
-                  const previous = data.history
-                    .flatMap((w) => w.exercises)
-                    .find((e) => e.name === ex.name)
-                    ?.sets.filter((s) => s.done)
-                    .at(-1);
                   return (
                     <section className="card exercise" key={ex.id || i}>
                       <div className="row">
                         <div>
                           <h3>{ex.name}</h3>
                           <p className="muted">
-                            {previous
-                              ? `Last: ${previous.weight || 0} kg × ${previous.reps}`
-                              : 'No previous set'}{' '}
-                            · {ex.rest === null ? 'Rest unspecified' : `${ex.rest}s rest`}
+                            {ex.rest === null ? 'Rest unspecified' : `${ex.rest}s rest`}
                           </p>
                         </div>
                         <button
@@ -499,6 +494,12 @@ function App() {
                             );
                             activeChange((w) => {
                               w.exercises[i].name = name.trim() || ex.name;
+                              if (
+                                exerciseIdentity(w.exercises[i].name) !== exerciseIdentity(ex.name)
+                              ) {
+                                w.exercises[i].exerciseKey = exerciseIdentity(w.exercises[i].name);
+                                delete w.exercises[i].previousPerformance;
+                              }
                               if (rest && Number.isFinite(Number(rest)) && Number(rest) > 0)
                                 w.exercises[i].rest = Math.min(3600, Math.round(Number(rest)));
                               return w;
@@ -531,18 +532,28 @@ function App() {
                           <p>{ex.notes}</p>
                         </details>
                       )}
-                      <div className="setrow set-head">
+                      <div className="setrow performance-row set-head">
                         <span>SET</span>
+                        <span className="last-heading">LAST TIME</span>
                         <span>KG</span>
                         <span>REPS</span>
                         <span>DONE</span>
                       </div>
                       {ex.sets.map((s, j) => (
-                        <div className={`setrow ${s.done ? 'done' : ''}`} key={j}>
+                        <div className={`setrow performance-row ${s.done ? 'done' : ''}`} key={j}>
                           <span>
                             {s.prescription
                               ? (s.prescription.number ?? '?')
                               : String(j + 1).padStart(2, '0')}
+                          </span>
+                          <span className="previous-set">
+                            {(() => {
+                              const n = setNumber(s, j);
+                              const last = n === null ? undefined : ex.previousPerformance?.sets[n];
+                              return last
+                                ? `Last: ${last.weight} kg × ${last.reps}`
+                                : 'No previous performance';
+                            })()}
                           </span>
                           {(['weight', 'reps'] as const).map((field) => (
                             <input
@@ -577,8 +588,7 @@ function App() {
                           )}
                         </div>
                       ))}
-                      <div className="set-adjust">
-                        <span className="muted">Sets</span>
+                      <div className="set-adjust compact-set-adjust">
                         <div>
                           <button
                             aria-label={`Remove set from ${ex.name}`}
@@ -597,13 +607,13 @@ function App() {
                           >
                             −
                           </button>
-                          <b>{ex.sets.length}</b>
                           <button
                             aria-label={`Add set to ${ex.name}`}
                             disabled={ex.sets.length >= 12}
                             onClick={() =>
                               activeChange((w) => {
-                                w.exercises[i].sets.push(newSet());
+                                const exercise = w.exercises[i];
+                                addPerformanceSet(exercise);
                                 return w;
                               })
                             }
