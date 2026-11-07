@@ -1,3 +1,4 @@
+import { preparePerformance, type PerformanceReference } from './performance';
 import type { SetPrescription } from './prescriptions';
 import type { Rotation } from './workouts';
 import { openDB } from 'idb';
@@ -11,6 +12,8 @@ export interface SetEntry {
   prescription?: SetPrescription;
 }
 export interface Exercise {
+  exerciseKey?: string;
+  previousPerformance?: PerformanceReference;
   id: string;
   name: string;
   rest: number | null;
@@ -191,44 +194,53 @@ export async function restoreBackup(current: Data, input: unknown, name?: string
   }
 }
 export const newSet = (): SetEntry => ({ weight: '', reps: '', done: false });
-export function createWorkout(name: string, week: string, plan: Plan, now = Date.now()): Workout {
+export function createWorkout(
+  name: string,
+  week: string,
+  plan: Plan,
+  now = Date.now(),
+  history: Workout[] = [],
+): Workout {
   const keys = Object.keys(defaultPlan());
   const key = templateKey(name, week);
-  return {
-    id: crypto.randomUUID(),
-    name,
-    week,
-    started: now,
-    restEnd: null,
-    restSeconds: null,
-    exercises: (
-      plan[key] ||
-      plan[name] ||
-      defaultPlan()[key] ||
-      defaultPlan()[name] ||
-      defaultPlan()[keys[0]]
-    ).map(([name, count, rest, prescription]) => ({
+  return preparePerformance(
+    {
       id: crypto.randomUUID(),
       name,
-      rest,
-      ...(prescription
-        ? {
-            targetReps: prescription.reps,
-            notes: prescription.notes,
-            exerciseIntensity: prescription.exerciseIntensity,
-            optional: prescription.optional,
-            alternatives: prescription.alternatives,
-            kind: prescription.kind,
-          }
-        : {}),
-      sets: Array.from({ length: count ?? 0 }, (_, i) => ({
-        ...newSet(),
-        ...(prescription?.setPrescriptions?.[i]
-          ? { prescription: structuredClone(prescription.setPrescriptions[i]) }
+      week,
+      started: now,
+      restEnd: null,
+      restSeconds: null,
+      exercises: (
+        plan[key] ||
+        plan[name] ||
+        defaultPlan()[key] ||
+        defaultPlan()[name] ||
+        defaultPlan()[keys[0]]
+      ).map(([name, count, rest, prescription]) => ({
+        id: crypto.randomUUID(),
+        name,
+        rest,
+        ...(prescription
+          ? {
+              targetReps: prescription.reps,
+              notes: prescription.notes,
+              exerciseIntensity: prescription.exerciseIntensity,
+              optional: prescription.optional,
+              alternatives: prescription.alternatives,
+              kind: prescription.kind,
+            }
           : {}),
+        sets: Array.from({ length: count ?? 0 }, (_, i) => ({
+          ...newSet(),
+          ...(prescription?.setPrescriptions?.[i]
+            ? { prescription: structuredClone(prescription.setPrescriptions[i]) }
+            : {}),
+        })),
       })),
-    })),
-  };
+    },
+    history,
+  );
 }
 export function completeSet(workout: Workout, i: number, j: number, now = Date.now()): Workout {
   const next = structuredClone(workout),

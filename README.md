@@ -86,3 +86,13 @@ The earlier generic formats (`4 x 6–8`, `3 sets of 12 reps`, `rest 1:30`, alia
 The parser and draft validation live in `src/plan-import.ts`. They are pure functions returning `PlanDraft`; persistence is isolated in `src/plan-storage.ts`, and the editor is in `src/PlanImporter.tsx`. A future AI adapter can return the same draft shape and must pass the same review/confirmation path. No AI API, credentials, paid service, or backend is used.
 
 Use the same hostname and port on your Mac as before to access your existing browser storage. If changing origins, export a JSON backup first and merge it into the new origin. The automated tests use isolated storage and do not apply sample plans to your personal data.
+
+## Phase 2 feature 1: previous performance
+
+New workouts store a separate frozen per-set reference from saved, finished workout history. Only completed sets are eligible. Exercise identity uses exact names (case and whitespace normalized only); equipment, punctuation and variant words are never fuzzy-matched. Renamed/unknown variants receive no comparison, and missing exercise intensity is not inferred from session intensity.
+
+Candidates must match exercise-level intensity. An exact workout template (including rotation week) takes priority, then the same rotation week, then the newest eligible other session. Within each priority, the most recently finished session wins. Only that session supplies comparisons; missing or incomplete sets are not backfilled from older sessions. Source set numbers are respected; ambiguous duplicate historical numbers are not used.
+
+Today’s weight/reps are editable suggestions from the reference, separate from planned targets and actual completion flags. No set is completed automatically. Editing today does not change the reference or history. Adding a set uses the same source snapshot if that set number was completed; removing a set changes only the active session. For numbered prescriptions, added sets follow the highest current source number without duplicating existing numbers.
+
+The references and edited values persist with the active workout in IndexedDB, including reload/reopen. Previous results are inline beside inputs on wider screens and directly above the inputs on phones. Small icon-only set controls remain at the bottom right. Existing importer, rotation, history, PRs and offline behavior are unchanged.
