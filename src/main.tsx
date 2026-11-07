@@ -1,3 +1,4 @@
+import { repsLabel } from './prescriptions';
 import { saveImportedPlan } from './plan-storage';
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -184,6 +185,7 @@ function App() {
       const next = await saveImportedPlan(current.current, draft, true);
       current.current = next;
       setData(next);
+      if (next.rotation?.sessions[0]) setPlanKey(next.rotation.sessions[0].key);
       setError('');
     } finally {
       importing.current = false;
@@ -227,6 +229,14 @@ function App() {
           )
             records.set(e.name, { weight: Number(s.weight), reps: Number(s.reps) });
         }
+  const rotationSession = data.rotation?.sessions.find(
+    (s) => s.week === (data.rotationWeek || 1) && s.workout === cards[index].key,
+  );
+  const selectedIntensity = rotationSession
+    ? rotationSession.intensity === 'hard'
+      ? 'heavy'
+      : 'easy'
+    : data.week;
   return (
     <>
       <main inert={restoring} className={tab === 'Train' && !active ? 'home-screen' : undefined}>
@@ -269,12 +279,37 @@ function App() {
                   <h2>Your workout</h2>
                   <span>{String(index + 1).padStart(2, '0')} / 04</span>
                 </div>
+                {data.rotation && (
+                  <div className="rotation-selection">
+                    <label htmlFor="rotation-week">TRAINING ROTATION</label>
+                    <select
+                      id="rotation-week"
+                      value={data.rotationWeek || 1}
+                      onChange={(e) =>
+                        change((d) => ({ ...d, rotationWeek: Number(e.target.value) }))
+                      }
+                    >
+                      {data.rotation.weeks.map((w) => (
+                        <option key={w} value={w}>
+                          Week {w}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="muted">
+                      {rotationSession
+                        ? `${rotationSession.day} · ${rotationSession.intensity === 'hard' ? 'Hard' : 'Easy'} session`
+                        : 'No session scheduled for this workout in this week.'}
+                    </p>
+                  </div>
+                )}
                 <WorkoutCarousel
                   ref={carousel}
                   selected={index}
                   onSelect={setIndex}
                   plan={data.plan}
-                  week={data.week}
+                  week={selectedIntensity}
+                  rotation={data.rotation}
+                  rotationWeek={data.rotationWeek || 1}
                 />
                 <div className="intensity">
                   <span className="eyebrow">TRAINING INTENSITY</span>
@@ -282,9 +317,29 @@ function App() {
                     {['easy', 'heavy'].map((w) => (
                       <button
                         key={w}
-                        aria-pressed={data.week === w}
-                        className={data.week === w ? 'chosen' : ''}
-                        onClick={() => change((d) => ({ ...d, week: w }))}
+                        aria-pressed={selectedIntensity === w}
+                        className={selectedIntensity === w ? 'chosen' : ''}
+                        disabled={
+                          !!data.rotation &&
+                          !data.rotation.sessions.some(
+                            (s) =>
+                              s.workout === cards[index].key &&
+                              s.intensity === (w === 'heavy' ? 'hard' : 'easy'),
+                          )
+                        }
+                        onClick={() =>
+                          change((d) => {
+                            if (d.rotation) {
+                              const matching = d.rotation.sessions.find(
+                                (s) =>
+                                  s.workout === cards[index].key &&
+                                  s.intensity === (w === 'heavy' ? 'hard' : 'easy'),
+                              );
+                              return matching ? { ...d, rotationWeek: matching.week } : d;
+                            }
+                            return { ...d, week: w };
+                          })
+                        }
                       >
                         {w === 'heavy' ? 'HARD' : 'EASY'}
                       </button>
@@ -293,10 +348,17 @@ function App() {
                 </div>
                 <button
                   className="primary start"
+                  disabled={!!data.rotation && !rotationSession}
                   onClick={() =>
                     change((d) => ({
                       ...d,
-                      active: createWorkout(cards[index].key, d.week, d.plan),
+                      active: rotationSession
+                        ? createWorkout(
+                            rotationSession.key,
+                            rotationSession.intensity === 'hard' ? 'heavy' : 'easy',
+                            d.plan,
+                          )
+                        : createWorkout(cards[index].key, d.week, d.plan),
                     }))
                   }
                 >
@@ -357,7 +419,11 @@ function App() {
                           ? active.restEnd > now
                             ? 'Resting'
                             : 'Rest complete'
-                          : 'Starts after a set'}
+                          : active.exercises.some(
+                                (e) => e.rest === null && e.sets.some((s) => s.done),
+                              )
+                            ? 'Rest unspecified — choose a timer if needed'
+                            : 'Starts after a set'}
                       </p>
                     </div>
                     <button onClick={() => activeChange((w) => ({ ...w, restEnd: null }))}>
@@ -419,7 +485,7 @@ function App() {
                             {previous
                               ? `Last: ${previous.weight || 0} kg × ${previous.reps}`
                               : 'No previous set'}{' '}
-                            · {ex.rest}s rest
+                            · {ex.rest === null ? 'Rest unspecified' : `${ex.rest}s rest`}
                           </p>
                         </div>
                         <button
@@ -427,7 +493,10 @@ function App() {
                           onClick={() => {
                             const name = prompt('Exercise name', ex.name);
                             if (name === null) return;
-                            const rest = prompt('Rest between sets (seconds)', String(ex.rest));
+                            const rest = prompt(
+                              'Rest between sets (seconds)',
+                              ex.rest === null ? '' : String(ex.rest),
+                            );
                             activeChange((w) => {
                               w.exercises[i].name = name.trim() || ex.name;
                               if (rest && Number.isFinite(Number(rest)) && Number(rest) > 0)
@@ -439,6 +508,20 @@ function App() {
                           Edit
                         </button>
                       </div>
+                      {(ex.exerciseIntensity || ex.optional) && (
+                        <p className="eyebrow">
+                          {ex.exerciseIntensity}
+                          {ex.optional ? ' · OPTIONAL' : ''}
+                        </p>
+                      )}
+                      {ex.alternatives?.length ? (
+                        <p className="muted">Alternatives: {ex.alternatives.join(' OR ')}</p>
+                      ) : null}
+                      {ex.sets.length === 0 && (
+                        <p className="muted">
+                          Set count unspecified. Add sets only as you choose to perform them.
+                        </p>
+                      )}
                       {ex.targetReps && (
                         <p className="muted prescription">Target: {ex.targetReps} reps</p>
                       )}
@@ -456,7 +539,11 @@ function App() {
                       </div>
                       {ex.sets.map((s, j) => (
                         <div className={`setrow ${s.done ? 'done' : ''}`} key={j}>
-                          <span>{String(j + 1).padStart(2, '0')}</span>
+                          <span>
+                            {s.prescription
+                              ? (s.prescription.number ?? '?')
+                              : String(j + 1).padStart(2, '0')}
+                          </span>
                           {(['weight', 'reps'] as const).map((field) => (
                             <input
                               key={field}
@@ -482,6 +569,12 @@ function App() {
                           >
                             {s.done ? '✓' : '○'}
                           </button>
+                          {s.prescription && (
+                            <small className="prescription-per-set">
+                              Set {s.prescription.number ?? '?'}: {repsLabel(s.prescription)} reps ·{' '}
+                              {s.prescription.effort}
+                            </small>
+                          )}
                         </div>
                       ))}
                       <div className="set-adjust">
@@ -685,16 +778,19 @@ function App() {
                     <div>
                       <b>{name}</b>
                       <p className="muted">
-                        {count} sets · {rest}s rest
+                        {count ?? 'Unspecified'} sets ·{' '}
+                        {rest === null ? 'Rest unspecified' : `${rest}s rest`}
                       </p>
                     </div>
                     <div className="stepper">
                       <button
                         aria-label={`Fewer sets ${name}`}
-                        disabled={count <= 1}
+                        disabled={count === null || count <= 1}
                         onClick={() =>
                           change((d) => {
-                            d.plan[d.plan[planKey] ? planKey : Object.keys(d.plan)[0]][i][1]--;
+                            const ex =
+                              d.plan[d.plan[planKey] ? planKey : Object.keys(d.plan)[0]][i];
+                            ex[1] = Math.max(1, (ex[1] ?? 0) - 1);
                             return d;
                           })
                         }
@@ -703,10 +799,12 @@ function App() {
                       </button>
                       <button
                         aria-label={`More sets ${name}`}
-                        disabled={count >= 12}
+                        disabled={count !== null && count >= 12}
                         onClick={() =>
                           change((d) => {
-                            d.plan[d.plan[planKey] ? planKey : Object.keys(d.plan)[0]][i][1]++;
+                            const ex =
+                              d.plan[d.plan[planKey] ? planKey : Object.keys(d.plan)[0]][i];
+                            ex[1] = (ex[1] ?? 0) + 1;
                             return d;
                           })
                         }

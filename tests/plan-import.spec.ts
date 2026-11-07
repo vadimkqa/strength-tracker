@@ -72,16 +72,14 @@ test('TXT preview is non-destructive; confirmed import preserves history, PRs an
     .locator('#plan-file')
     .setInputFiles({ name: 'program.txt', mimeType: 'text/plain', buffer: Buffer.from(source) });
   await page.getByRole('button', { name: 'Parse TXT', exact: true }).click();
-  await expect(page.getByLabel('EXERCISE NAME', { exact: true }).first()).toHaveValue(
-    'Custom Bench',
-  );
-  await expect(page.getByLabel('EXERCISE NAME', { exact: true }).nth(1)).toHaveValue('Cable Fly');
+  await expect(page.locator('.review-exercise-title strong').first()).toHaveText('1. Custom Bench');
+  await expect(page.locator('.review-exercise-title strong').nth(1)).toHaveText('2. Cable Fly');
   await expect(
     page.getByRole('button', { name: 'Apply imported plan', exact: true }),
   ).toBeDisabled();
   expect(await state(page)).toEqual(before);
   await page
-    .getByLabel('I confirm replacing the listed workout templates with this preview', {
+    .getByLabel('I confirm applying these templates, preserving all unspecified values as unset', {
       exact: true,
     })
     .check();
@@ -121,19 +119,26 @@ test('ambiguous TXT must be edited and assigned before applying; cancellation ke
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const before = await state(page);
+  await page.getByText('Source text and workout aliases', { exact: true }).click();
   await page.locator('#plan-source').fill('Unrecognized Day:\nOdd movement — 3-4 sets, rest 90');
   await page.getByRole('button', { name: 'Parse TXT', exact: true }).click();
   await expect(
     page.getByRole('button', { name: 'Apply imported plan', exact: true }),
   ).toBeDisabled();
-  await page.getByLabel('WORKOUT', { exact: true }).selectOption('Thursday · Back focus');
-  await page.getByLabel('INTENSITY', { exact: true }).selectOption('easy');
+  await page.locator('.review-exercise > summary').first().click();
+  await page.locator('.exercise-editor > summary').first().click();
+  await page
+    .getByLabel('WORKOUT ASSIGNMENT', { exact: true })
+    .selectOption('Thursday · Back focus');
+  await page.getByLabel('SESSION INTENSITY', { exact: true }).selectOption('easy');
   await page.getByLabel('SETS', { exact: true }).fill('3');
   await page.getByLabel('REST (SECONDS)', { exact: true }).fill('90');
   await page.getByLabel('Keep reps unspecified — do not invent a target').check();
-  await page.getByLabel('I reviewed the source and resolved these ambiguities above').check();
   await page
-    .getByLabel('I confirm replacing the listed workout templates with this preview')
+    .getByLabel('I reviewed these source warnings; keep unedited values exactly as written')
+    .check();
+  await page
+    .getByLabel('I confirm applying these templates, preserving all unspecified values as unset')
     .check();
   await expect(
     page.getByRole('button', { name: 'Apply imported plan', exact: true }),
@@ -152,15 +157,18 @@ test('preview edits and ordering persist into templates and import works offline
   await page.waitForFunction(() => !!navigator.serviceWorker.controller);
   await context.setOffline(true);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByText('Source text and workout aliases', { exact: true }).click();
   await page
     .locator('#plan-source')
     .fill('Leg Day Easy\nLeg Press 4x8 rest 2 min\nCalf Raise 3x12 rest 60s');
   await page.getByRole('button', { name: 'Parse TXT', exact: true }).click();
-  await page.getByRole('button', { name: 'Move exercise 2 up', exact: true }).click();
+  await page.locator('.review-exercise > summary').nth(1).click();
+  await page.locator('.exercise-editor > summary').nth(1).click();
+  await page.getByRole('button', { name: 'Move up', exact: true }).click();
   await page.getByLabel('EXERCISE NAME', { exact: true }).first().fill('Seated Calf Raise');
   await page.getByLabel('SETS', { exact: true }).first().fill('2');
   await page
-    .getByLabel('I confirm replacing the listed workout templates with this preview')
+    .getByLabel('I confirm applying these templates, preserving all unspecified values as unset')
     .check();
   await page.getByRole('button', { name: 'Apply imported plan', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Plan applied.' })).toBeVisible();
