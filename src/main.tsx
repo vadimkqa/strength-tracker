@@ -312,6 +312,17 @@ function App() {
                   rotation={data.rotation}
                   rotationWeek={data.rotationWeek || 1}
                 />
+                <div className="pagination" aria-label="Choose workout">
+                  {cards.map((c, i) => (
+                    <button
+                      key={c.name}
+                      aria-label={`Select ${c.name}`}
+                      aria-current={index === i ? 'true' : undefined}
+                      className={index === i ? 'selected' : ''}
+                      onClick={() => carousel.current?.select(i)}
+                    />
+                  ))}
+                </div>
                 <div className="intensity">
                   <span className="eyebrow">TRAINING INTENSITY</span>
                   <div className="segmented" role="group" aria-label="Training intensity">
@@ -367,17 +378,6 @@ function App() {
                 >
                   START WORKOUT <span>→</span>
                 </button>
-                <div className="pagination" aria-label="Choose workout">
-                  {cards.map((c, i) => (
-                    <button
-                      key={c.name}
-                      aria-label={`Select ${c.name}`}
-                      aria-current={index === i ? 'true' : undefined}
-                      className={index === i ? 'selected' : ''}
-                      onClick={() => carousel.current?.select(i)}
-                    />
-                  ))}
-                </div>
                 <p className="footnote">Your training. Your data. Always with you.</p>
               </>
             ) : (

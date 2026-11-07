@@ -96,3 +96,9 @@ Candidates must match exercise-level intensity. An exact workout template (inclu
 Today’s weight/reps are editable suggestions from the reference, separate from planned targets and actual completion flags. No set is completed automatically. Editing today does not change the reference or history. Adding a set uses the same source snapshot if that set number was completed; removing a set changes only the active session. For numbered prescriptions, added sets follow the highest current source number without duplicating existing numbers.
 
 The references and edited values persist with the active workout in IndexedDB, including reload/reopen. Previous results are inline beside inputs on wider screens and directly above the inputs on phones. Small icon-only set controls remain at the bottom right. Existing importer, rotation, history, PRs and offline behavior are unchanged.
+
+## Layered Train selector
+
+Train uses a playing-card stack: one centered active card, rotated/dimmed previous and next cards, and a hidden fourth card. Only transforms and opacity animate. Touch swipes and mouse drags select the next/previous workout; tapping an exposed side card brings it forward. Arrow buttons, keyboard arrows and pagination provide equivalent accessible controls. Reduced-motion preferences disable transitions, and vertical touch scrolling stays native.
+
+Cards show the existing imported session's day, rotation week, intensity, photo and exercise/core/optional counts. Week selection, Hard/Easy variant routing and Start Workout use the same saved templates as before. Pagination sits below the stack; no training data or storage schema changes are made by this redesign.

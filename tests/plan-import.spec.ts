@@ -179,7 +179,7 @@ test('preview edits and ordering persist into templates and import works offline
   ]);
   expect(saved.plan['Sunday · Legs · Easy'][0][1]).toBe(2);
 });
-test('centered carousel shows both neighbors, supports mouse dragging, arrows and wraparound', async ({
+test('layered stack shows both neighbors, supports mouse dragging, arrows and wraparound', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 900, height: 1000 });
@@ -197,7 +197,7 @@ test('centered carousel shows both neighbors, supports mouse dragging, arrows an
     const p = el.getBoundingClientRect();
     return Array.from(el.children).filter((c) => {
       const r = c.getBoundingClientRect();
-      return r.right > p.left && r.left < p.right;
+      return getComputedStyle(c).opacity !== '0' && r.right > p.left && r.left < p.right;
     }).length;
   });
   expect(visible).toBe(3);
