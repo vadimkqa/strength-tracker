@@ -39,3 +39,18 @@ export const templateLabel = (key: string) => {
   const match = workouts.find((w) => w.key === base);
   return match ? `${match.name}${easy ? ' · Easy' : ''}` : key;
 };
+
+export interface RotationSession {
+  week: number;
+  day: string;
+  workout: WorkoutId;
+  intensity: Intensity;
+  key: string;
+}
+export interface Rotation {
+  weeks: number[];
+  sessions: RotationSession[];
+}
+export function rotationKey(workout: WorkoutId, week: number, day: string, intensity: string) {
+  return `Week ${week} · ${day || 'Day unspecified'} · ${workouts.find((w) => w.key === workout)!.name} · ${intensity === 'easy' ? 'Easy' : 'Hard'}`;
+}

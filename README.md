@@ -58,17 +58,30 @@ The Train carousel centers one large card with both neighbors peeking in. It wra
 
 To review a TXT program:
 
-1. Open **Settings → Import Training Plan** and choose your TXT file, or paste its contents. Files are decoded locally (UTF-8 or UTF-16 with a BOM); maximum 1 MB and 2,000 lines. Nothing is uploaded.
-2. Optionally enter aliases, one per line, such as `Push A = Bench Day`. The four destination names are Bench Day, DB Press Day, Hammer Press Day and Leg Day. The original v1 template names are recognized too. An inline heading such as `Bench Day (aka Push A)` also defines an alias for later headings.
-3. Click **Parse TXT**. Review each exercise name, workout assignment, Hard/Easy variant, set count, rep target, rest in seconds, and notes. Source lines remain available. Use move controls to change order, exclude non-exercise lines explicitly, or add missing exercises.
-4. Fix missing values and acknowledge ambiguity warnings. Exercise categories are never guessed. If the file specifies category defaults (`Compounds: 4 sets; Isolation: 3 sets`), apply them using explicit category labels or manual category selection. Defaults before any workout heading are global; defaults within a workout apply only until the next workout/intensity heading. Missing reps must be supplied or explicitly left unspecified.
-5. Inspect **Templates to replace**, check the explicit confirmation box, then click **Apply imported plan**. Cancelling or leaving a preview unapplied has no effect on saved templates. Editing the source/aliases requires reparsing; editing any preview detail resets confirmation.
+1. Open **Settings → Import Training Plan**, choose your TXT, and click **Parse TXT**. Source text and aliases are available in a collapsed panel. Files stay on-device (UTF-8 or BOM-marked UTF-16; maximum 1 MB / 2,000 lines).
+2. Review the compact summary, choose **Week** and **Workout**, and check exercises in their original order. Individual intensity, optional/core status, source set numbers, rep ranges and effort are shown without opening editing forms.
+3. Expand only exercises you want to inspect or correct. The source-warning index jumps to the affected session. Details support name/session/intensity edits and per-set number, min/max reps and effort edits. Add/remove/move a prescription entry explicitly; the parser never renumbers automatically.
+4. Resolve source errors or explicitly acknowledge keeping the original ambiguous values. Missing rest durations stay `null`; core exercises without a set count stay unspecified. No automatic countdown starts for an exercise with unknown rest. Core sets can be added explicitly during a workout.
+5. Check the final template list, tick **I confirm applying these templates…**, then click **Apply imported plan**. Parsing, previewing, cancelling and acknowledging a warning do not write templates. A pre-import snapshot and the new state are saved in one transaction. History (and its PR source data), active sessions and existing preferences are retained.
 
-Supported examples include `4 x 6–8`, `3 sets of 12 reps`, `sets: 4, reps: 8, rest: 90s`, `rest 1:30`, and `rest 2m 30s`. Exercise continuation lines such as `Sets:`, `Reps:`, `Rest:`, `Tempo:`, `RIR:` and `Notes:` are retained. The full source prescription stays in notes, including details not interpreted by the parser. Ranged or conflicting set/rest prescriptions require review; the parser never invents a single set count or rest duration.
+### GYM.txt rotation
 
-The format example in [examples/training-plan-format.txt](examples/training-plan-format.txt) is illustrative, not a recommendation or a replacement for your own program. It is never applied automatically.
+The uploaded real program is retained verbatim as `tests/fixtures/GYM.txt` for regression coverage. Its first week is implicit, with an explicit `Week 2` boundary. The parser recognizes **2 weeks, 8 sessions and 58 exercises**:
 
-Only the explicitly listed workout/intensity groups are replaced, in the reviewed exercise order. Other templates, workout history (which supplies PRs), preferences, and the active session are preserved. Each confirmed import stores a pre-import snapshot and the new state in one IndexedDB transaction. The original v1 localStorage record remains untouched. Future sessions display imported rep targets and prescription notes; logged reps are never prefilled from a target range.
+| Week | Tuesday      | Thursday        | Friday      | Saturday            |
+| ---- | ------------ | --------------- | ----------- | ------------------- |
+| 1    | Bench · Hard | DB Press · Easy | Legs · Easy | Hammer Press · Hard |
+| 2    | Bench · Easy | DB Press · Hard | Legs · Hard | Hammer Press · Easy |
+
+Day-qualified headers such as `Tuesday; Bench (Heavy):` define sessions. Exercise `HARD`, `EASY` and `MID` labels remain independent of session intensity. `Optional:` is an optional exercise prefix, and `Core:` creates a core exercise with all `or` alternatives preserved. Blank lines and harmless Unicode whitespace do not create exercises.
+
+A block such as `(1:6 no fail; 2:4 no fail; 3:3-6 fail; 4:3-6 fail)` attaches to the preceding exercise and stores each original set number, minimum reps, maximum reps and exact effort instruction. It never becomes an exercise name. The regression snapshot records every exercise and prescription across the whole file, not just the first workout.
+
+Two source ambiguities are intentionally reported: Week 1 Bench pull-ups contains `half fail fail`, and Week 2 DB Press shrugs lists set numbers `1, 3, 4` (missing `2`). Neither is corrected or hidden automatically. A user can edit the prescription or explicitly keep its original wording/numbering. No rest durations are present in GYM.txt, and none are inferred.
+
+After a confirmed rotation import, Train retains the same four cards and adds a Week 1 / Week 2 selector. Each card uses that week's source session, including **Friday legs**. The Hard/Easy switch selects the corresponding scheduled variant/week; it does not reclassify individual exercises. Earlier templates remain stored, while the imported rotation determines new session selection. Already active sessions continue unchanged. The rotation and prescriptions survive reload and JSON backup restore.
+
+The earlier generic formats (`4 x 6–8`, `3 sets of 12 reps`, `rest 1:30`, aliases, and explicit compound/isolation defaults) remain supported. An illustrative generic example is in `examples/training-plan-format.txt`; it is never applied automatically.
 
 The parser and draft validation live in `src/plan-import.ts`. They are pure functions returning `PlanDraft`; persistence is isolated in `src/plan-storage.ts`, and the editor is in `src/PlanImporter.tsx`. A future AI adapter can return the same draft shape and must pass the same review/confirmation path. No AI API, credentials, paid service, or backend is used.
 

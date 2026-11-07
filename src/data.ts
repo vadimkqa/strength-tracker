@@ -1,3 +1,5 @@
+import type { SetPrescription } from './prescriptions';
+import type { Rotation } from './workouts';
 import { openDB } from 'idb';
 import { templateKey } from './workouts';
 import { defaultPlan, type Plan } from './templates';
@@ -6,11 +8,16 @@ export interface SetEntry {
   weight: string;
   reps: string;
   done: boolean;
+  prescription?: SetPrescription;
 }
 export interface Exercise {
   id: string;
   name: string;
-  rest: number;
+  rest: number | null;
+  exerciseIntensity?: string;
+  optional?: boolean;
+  alternatives?: string[];
+  kind?: string;
   targetReps?: string;
   notes?: string;
   sets: SetEntry[];
@@ -31,6 +38,8 @@ export interface Data {
   week: string;
   restDefault: number;
   plan: Plan;
+  rotation?: Rotation;
+  rotationWeek?: number;
   [key: string]: unknown;
 }
 export const emptyData = (): Data => ({
@@ -51,7 +60,7 @@ function validWorkout(w: unknown): w is Workout {
     x.exercises.every(
       (e) =>
         typeof e.name === 'string' &&
-        typeof e.rest === 'number' &&
+        (typeof e.rest === 'number' || e.rest === null) &&
         Array.isArray(e.sets) &&
         e.sets.every(
           (s) =>
@@ -82,11 +91,8 @@ export function parseData(input: unknown): Data {
             (r) =>
               Array.isArray(r) &&
               typeof r[0] === 'string' &&
-              Number.isInteger(r[1]) &&
-              r[1] > 0 &&
-              r[1] <= 12 &&
-              Number.isFinite(r[2]) &&
-              r[2] > 0,
+              (r[1] === null || (Number.isInteger(r[1]) && r[1] > 0 && r[1] <= 12)) &&
+              (r[2] === null || (Number.isFinite(r[2]) && r[2] > 0)),
           ),
       ))
   )
@@ -160,6 +166,12 @@ export function mergeBackup(current: Data, incoming: Data): Data {
     plan: { ...current.plan, ...incoming.plan },
     week: incoming.week,
     restDefault: incoming.restDefault,
+    ...(incoming.rotation
+      ? {
+          rotation: structuredClone(incoming.rotation),
+          rotationWeek: incoming.rotationWeek || incoming.rotation.weeks[0],
+        }
+      : {}),
   };
 }
 export async function restoreBackup(current: Data, input: unknown, name?: string) {
@@ -199,8 +211,22 @@ export function createWorkout(name: string, week: string, plan: Plan, now = Date
       id: crypto.randomUUID(),
       name,
       rest,
-      ...(prescription ? { targetReps: prescription.reps, notes: prescription.notes } : {}),
-      sets: Array.from({ length: count }, newSet),
+      ...(prescription
+        ? {
+            targetReps: prescription.reps,
+            notes: prescription.notes,
+            exerciseIntensity: prescription.exerciseIntensity,
+            optional: prescription.optional,
+            alternatives: prescription.alternatives,
+            kind: prescription.kind,
+          }
+        : {}),
+      sets: Array.from({ length: count ?? 0 }, (_, i) => ({
+        ...newSet(),
+        ...(prescription?.setPrescriptions?.[i]
+          ? { prescription: structuredClone(prescription.setPrescriptions[i]) }
+          : {}),
+      })),
     })),
   };
 }
@@ -218,7 +244,7 @@ export function completeSet(workout: Workout, i: number, j: number, now = Date.n
   s.done = !s.done;
   if (s.done) {
     next.restSeconds = next.exercises[i].rest;
-    next.restEnd = now + next.restSeconds * 1000;
+    next.restEnd = next.restSeconds === null ? null : now + next.restSeconds * 1000;
   }
   return next;
 }

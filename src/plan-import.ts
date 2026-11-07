@@ -1,9 +1,26 @@
+import { parseSetBlock, setWarnings, type SetPrescription } from './prescriptions';
 /** Pure rule-based TXT parsing. No storage, UI, network or exercise-name inference. */
-import { workouts, templateKey, type WorkoutId, type Intensity } from './workouts';
+import {
+  workouts,
+  templateKey,
+  type WorkoutId,
+  type Intensity,
+  rotationKey,
+  type RotationSession,
+} from './workouts';
 import type { Data } from './data';
 import type { Plan } from './templates';
 export type Category = '' | 'compound' | 'isolation';
 export interface DraftExercise {
+  week: number;
+  day: string;
+  exerciseIntensity: string;
+  setPrescriptions: SetPrescription[];
+  optional: boolean;
+  alternatives: string[];
+  kind: 'exercise' | 'core';
+  allowUnspecifiedRest: boolean;
+  allowUnspecifiedSets: boolean;
   id: string;
   line: number;
   source: string;
@@ -23,6 +40,7 @@ export interface DraftExercise {
   warnings: string[];
 }
 export interface PlanDraft {
+  rotation: boolean;
   rows: DraftExercise[];
   source: string;
   notices: string[];
@@ -151,6 +169,9 @@ function extract(line: string) {
 export function parseTrainingPlan(source: string, customAliases: Aliases = {}): PlanDraft {
   const aliases = { ...builtins };
   for (const [name, key] of Object.entries(customAliases)) aliases[normalize(name)] = key;
+  const rotation = /(?:^|[\r\n])\s*Week\s+\d+/i.test(source);
+  let week = 1,
+    day = '';
   const rows: DraftExercise[] = [],
     notices: string[] = [];
   let workout: WorkoutId | '' = '',
@@ -163,22 +184,71 @@ export function parseTrainingPlan(source: string, customAliases: Aliases = {}): 
     globalIsolationSets: number | null = null;
   const unknownContext: string[] = [];
   let canContinue = false;
+  function continueDefaults() {
+    compoundSets = globalCompoundSets;
+    isolationSets = globalIsolationSets;
+    categoryContext = '';
+  }
   source
     .replace(/^\uFEFF/, '')
     .split(/\r\n?|\n/)
     .forEach((original, index) => {
-      const line = original.trim();
+      const line = original.replace(/[\u200b\uFEFF]/g, '').trim();
       if (!line || /^[-=_]{3,}$/.test(line)) return;
       const text = line
         .replace(/^#+\s*/, '')
         .replace(/[\[\]]/g, '')
         .replace(/[:\s]+$/, '');
-      const found = heading(text, aliases),
-        variant = intensityOf(text);
+      const weekHeader = text.match(/^Week\s+(\d+)$/i);
+      if (weekHeader) {
+        week = Number(weekHeader[1]);
+        day = '';
+        workout = '';
+        intensity = '';
+        globalIntensity = '';
+        canContinue = false;
+        continueDefaults();
+        return;
+      }
+      // Day-qualified session headers are distinct from exercise names such as “DB Press EASY”.
+      const session = text.match(
+        /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s*[;,:]\s*(.*?)\s*\((Heavy|Hard|Easy)\)$/i,
+      );
+      const sessionNames: Record<string, WorkoutId> = {
+        bench: workouts[0].key,
+        'db press': workouts[1].key,
+        'leg day': workouts[3].key,
+        'hammer press': workouts[2].key,
+      };
+      const found = session
+        ? sessionNames[normalize(session[2])] || heading(session[2], aliases)
+        : heading(text, aliases);
+      const variant = session ? intensityOf(session[3]) : intensityOf(text);
+      // A parenthesized numbered set block always belongs to the preceding exercise.
+      if (/^\(/.test(line) && /(?:\d+\s*:|^\(\s*:?\s*\d)/.test(line)) {
+        const previous = canContinue ? rows.at(-1) : undefined;
+        if (previous) {
+          previous.setPrescriptions.push(...parseSetBlock(line));
+          previous.sets = previous.setPrescriptions.length;
+          previous.source += '\n' + original;
+          previous.notes += '\n' + original;
+          previous.warnings = previous.warnings.filter(
+            (w) => !w.startsWith('[Sets]') && !w.startsWith('No explicit prescription'),
+          );
+          previous.warnings.push(
+            ...setWarnings(previous.setPrescriptions).map((w) => '[Sets] ' + w),
+          );
+        } else
+          notices.push(
+            `Line ${index + 1}: orphan set prescription; it was not converted into an exercise: ${line}`,
+          );
+        return;
+      }
       const both = /\b(hard|heavy)\b/i.test(text) && /\beasy\b/i.test(text);
       if (found) {
         canContinue = false;
         workout = found;
+        day = session ? session[1][0].toUpperCase() + session[1].slice(1).toLowerCase() : '';
         intensity = variant || globalIntensity;
         categoryContext = '';
         compoundSets = globalCompoundSets;
@@ -232,9 +302,15 @@ export function parseTrainingPlan(source: string, customAliases: Aliases = {}): 
           : 'isolation';
         return;
       }
-      const parsed = extract(line);
+      const optional = /^Optional\s*:/i.test(line),
+        core = /^Core\s*:/i.test(line);
+      const exerciseLine = line.replace(/^(?:Optional|Core)\s*:\s*/i, '');
+      const individual = exerciseLine.match(/\s+(HARD|EASY|MID)\s*$/i);
+      const parsed = extract(exerciseLine.replace(/\s+(HARD|EASY|MID)\s*$/i, ''));
       // An unrecognized heading resets workout context so subsequent exercises cannot be assigned to the previous day silently.
       if (
+        !core &&
+        !optional &&
         !parsed.sets &&
         !parsed.reps &&
         !parsed.rest &&
@@ -280,7 +356,7 @@ export function parseTrainingPlan(source: string, customAliases: Aliases = {}): 
         return;
       }
       if (!parsed.category) parsed.category = categoryContext;
-      if (!parsed.sets && !parsed.reps && !parsed.rest)
+      if (!rotation && !parsed.sets && !parsed.reps && !parsed.rest)
         parsed.warnings.push(
           'No explicit prescription on this line; verify whether it is an exercise or a heading.',
         );
@@ -293,6 +369,16 @@ export function parseTrainingPlan(source: string, customAliases: Aliases = {}): 
             : null);
       canContinue = true;
       rows.push({
+        week,
+        day,
+        exerciseIntensity: individual?.[1].toUpperCase() || '',
+        setPrescriptions: [],
+        optional,
+        alternatives:
+          parsed.name.split(/\s+or\s+/i).length > 1 ? parsed.name.split(/\s+or\s+/i) : [],
+        kind: core ? 'core' : 'exercise',
+        allowUnspecifiedRest: rotation,
+        allowUnspecifiedSets: rotation && core,
         id: `line-${index + 1}`,
         line: index + 1,
         source: original,
@@ -306,7 +392,7 @@ export function parseTrainingPlan(source: string, customAliases: Aliases = {}): 
         notes: unknownContext.length ? `Context: ${unknownContext.at(-1)}\n${original}` : original,
         compoundSets,
         isolationSets,
-        allowUnspecifiedReps: false,
+        allowUnspecifiedReps: rotation && core,
         reviewed: false,
         excluded: false,
         warnings: parsed.warnings,
@@ -314,7 +400,7 @@ export function parseTrainingPlan(source: string, customAliases: Aliases = {}): 
     });
   if (!rows.length)
     notices.push('No exercise rows found. Check the format or add an exercise manually.');
-  return { rows, source, notices };
+  return { rows, source, notices, rotation };
 }
 export function rowProblems(row: DraftExercise): string[] {
   if (row.excluded) return [];
@@ -322,11 +408,17 @@ export function rowProblems(row: DraftExercise): string[] {
   if (!row.name.trim()) issues.push('Exercise name is missing.');
   if (!workouts.some((w) => w.key === row.workout)) issues.push('Assign a workout.');
   if (row.intensity !== 'hard' && row.intensity !== 'easy') issues.push('Choose Hard or Easy.');
-  if (!Number.isInteger(row.sets) || Number(row.sets) < 1 || Number(row.sets) > 12)
+  if (
+    !(row.sets === null && row.allowUnspecifiedSets) &&
+    (!Number.isInteger(row.sets) || Number(row.sets) < 1 || Number(row.sets) > 12)
+  )
     issues.push('Enter 1–12 sets.');
-  if (!Number.isFinite(row.rest) || Number(row.rest) <= 0 || Number(row.rest) > 3600)
+  if (
+    !(row.rest === null && row.allowUnspecifiedRest) &&
+    (!Number.isFinite(row.rest) || Number(row.rest) <= 0 || Number(row.rest) > 3600)
+  )
     issues.push('Enter rest in seconds (1–3600).');
-  if (!row.reps.trim() && !row.allowUnspecifiedReps)
+  if (!row.reps.trim() && !row.setPrescriptions.length && !row.allowUnspecifiedReps)
     issues.push('Enter reps or explicitly keep them unspecified.');
   if (row.warnings.length && !row.reviewed)
     issues.push('Review and acknowledge the source warnings.');
@@ -338,12 +430,24 @@ export function draftTemplates(draft: PlanDraft): Plan {
   for (const row of draft.rows) {
     if (row.excluded) continue;
     if (rowProblems(row).length) throw Error(`Line ${row.line}: ${rowProblems(row).join(' ')}`);
-    const key = templateKey(row.workout, row.intensity);
+    const key = draft.rotation
+      ? rotationKey(row.workout as WorkoutId, row.week, row.day, row.intensity)
+      : templateKey(row.workout, row.intensity);
     (plan[key] ??= []).push([
       row.name.trim(),
       row.sets!,
       row.rest!,
-      { reps: row.reps.trim(), notes: row.notes, category: row.category, source: row.source },
+      {
+        reps: row.reps.trim(),
+        notes: row.notes,
+        category: row.category,
+        source: row.source,
+        setPrescriptions: row.setPrescriptions,
+        exerciseIntensity: row.exerciseIntensity,
+        optional: row.optional,
+        alternatives: row.alternatives,
+        kind: row.kind,
+      },
     ]);
   }
   return plan;
@@ -366,5 +470,35 @@ export function parseAliases(text: string): Aliases {
 export function applyImportedPlan(current: Data, draft: PlanDraft, confirmed: boolean): Data {
   if (confirmed !== true)
     throw Error('Explicit confirmation is required before replacing templates.');
-  return { ...current, plan: { ...current.plan, ...draftTemplates(draft) } };
+  const plan = draftTemplates(draft);
+  const sessions = draftSessions(draft);
+  return {
+    ...current,
+    plan: { ...current.plan, ...plan },
+    ...(draft.rotation
+      ? {
+          rotation: { weeks: [...new Set(sessions.map((s) => s.week))], sessions },
+          rotationWeek: sessions[0]?.week || 1,
+        }
+      : {}),
+  };
+}
+
+export function draftSessions(draft: PlanDraft): RotationSession[] {
+  const sessions = new Map<string, RotationSession>();
+  for (const r of draft.rows) {
+    if (r.excluded || !r.workout || !r.intensity) continue;
+    const key = draft.rotation
+      ? rotationKey(r.workout, r.week, r.day, r.intensity)
+      : templateKey(r.workout, r.intensity);
+    if (!sessions.has(key))
+      sessions.set(key, {
+        key,
+        week: r.week,
+        day: r.day,
+        workout: r.workout,
+        intensity: r.intensity,
+      });
+  }
+  return [...sessions.values()];
 }

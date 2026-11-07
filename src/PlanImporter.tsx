@@ -4,9 +4,11 @@ import {
   parseAliases,
   rowProblems,
   draftTemplates,
+  draftSessions,
   type PlanDraft,
   type DraftExercise,
 } from './plan-import';
+import { setWarnings, repsLabel, type SetPrescription } from './prescriptions';
 import { workouts, templateLabel, type WorkoutId, type Intensity } from './workouts';
 interface Props {
   onApply: (draft: PlanDraft) => Promise<void>;
@@ -21,16 +23,40 @@ export function PlanImporter({ onApply }: Props) {
     [confirmed, setConfirmed] = useState(false),
     [busy, setBusy] = useState(false),
     [filename, setFilename] = useState('');
+  const [week, setWeek] = useState(1),
+    [workout, setWorkout] = useState<string>(workouts[0].key);
   const stale = !!draft && (draft.source !== source || aliases !== parsedAliases);
-  const issues = draft?.rows.filter((r) => !r.excluded).flatMap(rowProblems) || [];
   const included = draft?.rows.filter((r) => !r.excluded) || [];
+  const issues = included.flatMap(rowProblems),
+    sessions = draft ? draftSessions(draft) : [];
+  const weeks = [...new Set(draft?.rows.map((r) => r.week) || [1])].sort((a, b) => a - b);
+  const displayed = draft?.rows.filter((r) => r.week === week && r.workout === workout) || [];
+  const warningCount = included.reduce((n, r) => n + r.warnings.length, 0);
   let groups: Record<string, unknown[]> = {};
   if (draft && included.length && !issues.length) groups = draftTemplates(draft);
   function update(id: string, patch: Partial<DraftExercise>) {
+    if (patch.workout !== undefined) setWorkout(patch.workout);
     setConfirmed(false);
     setApplied(false);
     setDraft((d) =>
       d ? { ...d, rows: d.rows.map((r) => (r.id === id ? { ...r, ...patch } : r)) } : d,
+    );
+  }
+  function replaceSets(row: DraftExercise, sets: SetPrescription[]) {
+    update(row.id, {
+      setPrescriptions: sets,
+      sets: sets.length || null,
+      reviewed: false,
+      warnings: [
+        ...row.warnings.filter((w) => !w.startsWith('[Sets]')),
+        ...setWarnings(sets).map((w) => '[Sets] ' + w),
+      ],
+    });
+  }
+  function editSet(row: DraftExercise, index: number, patch: Partial<SetPrescription>) {
+    replaceSets(
+      row,
+      row.setPrescriptions.map((s, i) => (i === index ? { ...s, ...patch } : s)),
     );
   }
   async function readFile(file: File) {
@@ -57,9 +83,8 @@ export function PlanImporter({ onApply }: Props) {
   }
   function parse() {
     try {
-      if (source.length > 1_048_576) throw Error('The plan text must be 1 MB or smaller.');
-      if (source.split(/\r\n?|\n/).length > 2000)
-        throw Error('Please import at most 2,000 lines at a time.');
+      if (source.length > 1_048_576 || source.split(/\r\n?|\n/).length > 2000)
+        throw Error('Import at most 1 MB and 2,000 lines.');
       if (!source.trim()) throw Error('Choose a TXT file or paste your plan first.');
       const custom = parseAliases(aliases);
       if (
@@ -69,7 +94,10 @@ export function PlanImporter({ onApply }: Props) {
         )
       )
         return;
-      setDraft(parseTrainingPlan(source, custom));
+      const result = parseTrainingPlan(source, custom);
+      setDraft(result);
+      setWeek(result.rows[0]?.week || 1);
+      setWorkout(result.rows[0]?.workout || '');
       setParsedAliases(aliases);
       setConfirmed(false);
       setApplied(false);
@@ -78,22 +106,22 @@ export function PlanImporter({ onApply }: Props) {
       setError((e as Error).message);
     }
   }
-  function reorder(index: number, direction: number) {
+  function move(row: DraftExercise, direction: number) {
+    if (!draft) return;
+    const index = draft.rows.indexOf(row),
+      other = draft.rows.indexOf(displayed[displayed.indexOf(row) + direction]);
+    if (other < 0) return;
+    const rows = [...draft.rows];
+    [rows[index], rows[other]] = [rows[other], rows[index]];
+    setDraft({ ...draft, rows });
     setConfirmed(false);
     setApplied(false);
-    setDraft((d) => {
-      if (!d) return d;
-      const rows = [...d.rows];
-      [rows[index], rows[index + direction]] = [rows[index + direction], rows[index]];
-      return { ...d, rows };
-    });
   }
   return (
     <section className="card plan-importer" aria-labelledby="import-title">
       <h2 id="import-title">Import Training Plan</h2>
       <p className="muted">
-        Read a TXT file locally, then review every exercise. Uploading and previewing never change
-        your saved templates. No AI service or account is needed.
+        TXT parsing stays on this device. Uploading and reviewing never change saved templates.
       </p>
       <label htmlFor="plan-file">UPLOAD TXT FILE</label>
       <input
@@ -108,38 +136,29 @@ export function PlanImporter({ onApply }: Props) {
         }}
       />
       {filename && <p className="muted">Loaded: {filename}</p>}
-      <label htmlFor="plan-source">OR PASTE / EDIT THE PLAN TEXT</label>
-      <textarea
-        id="plan-source"
-        value={source}
-        rows={7}
-        disabled={busy}
-        onChange={(e) => {
-          setSource(e.target.value);
-          setConfirmed(false);
-          setApplied(false);
-        }}
-        placeholder={
-          'Bench Day — Hard\nBench Press — 4 x 6–8 — rest 3 min\nCable Fly — 3 x 12 — rest 90s'
-        }
-      />
       <details>
-        <summary>Supported formats and alternative workout names</summary>
+        <summary>Source text and workout aliases</summary>
+        <label htmlFor="plan-source">PASTE / EDIT PLAN TEXT</label>
+        <textarea
+          id="plan-source"
+          value={source}
+          rows={7}
+          disabled={busy}
+          onChange={(e) => {
+            setSource(e.target.value);
+            setConfirmed(false);
+            setApplied(false);
+          }}
+        />
         <p className="muted">
-          Use workout headings and Hard / Easy labels. Examples: “Bench Day — Hard”, “4 x 6–8”, “3
-          sets, 12 reps, rest 90s”, “rest 1:30”. Reps, tempo, RIR and other source instructions are
-          retained. Defaults such as “Compounds: 4 sets; Isolation: 3 sets” apply only when a
-          category is explicitly supplied or selected.
-        </p>
-        <p className="muted">
-          Unknown headings and missing values need manual review. Assign a custom heading using one
-          alias per line, or edit each row below. File headings may also use “Bench Day (aka Push
-          A)”.
+          Day headings such as “Tuesday; Bench (Heavy):” and “Week 2” define sessions. Numbered
+          prescriptions in parentheses attach to the exercise above. Rest times remain unset if
+          absent.
         </p>
         <label htmlFor="plan-aliases">OPTIONAL WORKOUT ALIASES</label>
         <textarea
           id="plan-aliases"
-          rows={3}
+          rows={2}
           value={aliases}
           disabled={busy}
           onChange={(e) => {
@@ -147,7 +166,7 @@ export function PlanImporter({ onApply }: Props) {
             setConfirmed(false);
             setApplied(false);
           }}
-          placeholder={'Push A = Bench Day\nUpper B = DB Press Day'}
+          placeholder="Push A = Bench Day"
         />
       </details>
       <button className="full" disabled={busy} onClick={parse}>
@@ -166,19 +185,24 @@ export function PlanImporter({ onApply }: Props) {
       )}
       {draft && (
         <div aria-label="Editable plan preview">
-          <h3>Editable preview</h3>
+          <h3>Review training plan</h3>
+          <p className="import-stats" role="status">
+            {weeks.length} weeks · {sessions.length} sessions · {included.length} exercises ·{' '}
+            {warningCount} warnings
+          </p>
           <p className="muted">
-            {included.length} included · {draft.rows.length - included.length} excluded. Rows keep
-            the file’s original order unless you move them.
+            {included.filter((r) => r.rest === null).length} exercises have no rest specified.{' '}
+            {included.filter((r) => r.sets === null).length} have no set count. Unknown values stay
+            unset.
           </p>
           {stale && (
-            <p className="import-warning" role="status">
-              The source or aliases changed. Reparse before applying.
+            <p role="status" className="import-warning">
+              Source changed. Reparse before applying.
             </p>
           )}
           {draft.notices.length > 0 && (
-            <details open>
-              <summary>Parser notices</summary>
+            <details>
+              <summary>Parser notices ({draft.notices.length})</summary>
               <ul className="parser-notices">
                 {draft.notices.map((n, i) => (
                   <li key={i}>{n}</li>
@@ -186,253 +210,451 @@ export function PlanImporter({ onApply }: Props) {
               </ul>
             </details>
           )}
-          {draft.rows.map((row, index) => {
-            const problems = rowProblems(row),
-              id = `import-${row.id}`;
-            return (
-              <fieldset
-                key={row.id}
-                className={`import-row ${row.excluded ? 'excluded' : ''}`}
-                disabled={busy}
+          {warningCount > 0 && (
+            <details className="review-warning-index">
+              <summary>Source warnings ({warningCount})</summary>
+              <ul className="parser-notices">
+                {included
+                  .filter((r) => r.warnings.length)
+                  .map((r) => (
+                    <li key={r.id}>
+                      <button
+                        onClick={() => {
+                          setWeek(r.week);
+                          setWorkout(r.workout);
+                          requestAnimationFrame(() => {
+                            const node = document.getElementById(
+                              `import-${r.id}`,
+                            ) as HTMLDetailsElement | null;
+                            if (node) {
+                              node.open = true;
+                              node.scrollIntoView({ block: 'nearest' });
+                            }
+                          });
+                        }}
+                      >
+                        Week {r.week} · {templateLabel(r.workout)} · {r.name}
+                      </button>
+                      : {r.warnings.map((w) => w.replace(/^\[Sets\] /, '')).join(' ')}
+                    </li>
+                  ))}
+              </ul>
+            </details>
+          )}
+          <div className="import-grid review-selectors">
+            <div>
+              <label htmlFor="review-week">WEEK</label>
+              <select
+                id="review-week"
+                value={week}
+                onChange={(e) => setWeek(Number(e.target.value))}
               >
-                <legend>
-                  Exercise {index + 1} · source line {row.line}
-                </legend>
-                <details>
-                  <summary>Original source</summary>
-                  <pre>{row.source}</pre>
-                </details>
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={!row.excluded}
-                    onChange={(e) => update(row.id, { excluded: !e.target.checked })}
-                  />
-                  Include this exercise
-                </label>
-                <label htmlFor={`${id}-name`}>EXERCISE NAME</label>
-                <input
-                  id={`${id}-name`}
-                  value={row.name}
-                  onChange={(e) => update(row.id, { name: e.target.value })}
-                />
-                <div className="import-grid">
-                  <div>
-                    <label htmlFor={`${id}-workout`}>WORKOUT</label>
-                    <select
-                      id={`${id}-workout`}
-                      value={row.workout}
-                      onChange={(e) =>
-                        update(row.id, { workout: e.target.value as WorkoutId | '' })
-                      }
-                    >
-                      <option value="">Assign workout…</option>
-                      {workouts.map((w) => (
-                        <option key={w.key} value={w.key}>
-                          {w.name}
-                        </option>
-                      ))}
-                    </select>
+                {weeks.map((w) => (
+                  <option key={w} value={w}>
+                    Week {w}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="review-workout">WORKOUT</label>
+              <select
+                id="review-workout"
+                value={workout}
+                onChange={(e) => setWorkout(e.target.value)}
+              >
+                {workouts.map((w) => (
+                  <option key={w.key} value={w.key}>
+                    {w.name}
+                  </option>
+                ))}
+                <option value="">Unassigned</option>
+              </select>
+            </div>
+          </div>
+          {displayed[0] && (
+            <p className="eyebrow review-session-title">
+              {displayed[0].day || 'Day unspecified'} · Week {week} ·{' '}
+              {displayed[0].intensity === 'easy'
+                ? 'Easy'
+                : displayed[0].intensity === 'hard'
+                  ? 'Hard'
+                  : 'Intensity unspecified'}{' '}
+              session
+            </p>
+          )}
+          {!displayed.length && <p className="muted">No exercises in this selection.</p>}
+          {displayed.map((row, index) => {
+            const problems = rowProblems(row),
+              id = `import-${row.id}`,
+              ambiguous = row.warnings.length > 0 || problems.length > 0;
+            return (
+              <details
+                id={id}
+                key={row.id}
+                className={`review-exercise ${row.excluded ? 'excluded' : ''}`}
+              >
+                <summary>
+                  <div className="review-exercise-title">
+                    <strong>
+                      {index + 1}. {row.name || 'Unnamed exercise'}
+                    </strong>
+                    <span>
+                      {row.exerciseIntensity || 'Intensity unspecified'}
+                      {row.optional ? ' · Optional' : ''}
+                      {row.kind === 'core' ? ' · Core' : ''}
+                    </span>
+                    <span className="compact-prescription">
+                      {row.setPrescriptions.length
+                        ? row.setPrescriptions
+                            .map((s) => `${s.number ?? '?'}: ${repsLabel(s)} ${s.effort}`)
+                            .join(' · ')
+                        : row.reps || 'Prescription not specified'}
+                    </span>
+                    {row.warnings.length > 0 && (
+                      <span className="compact-warning">
+                        {row.warnings.map((w) => w.replace(/^\[Sets\] /, '')).join(' ')}
+                      </span>
+                    )}
                   </div>
-                  <div>
-                    <label htmlFor={`${id}-intensity`}>INTENSITY</label>
-                    <select
-                      id={`${id}-intensity`}
-                      value={row.intensity}
-                      onChange={(e) =>
-                        update(row.id, { intensity: e.target.value as Intensity | '' })
-                      }
-                    >
-                      <option value="">Choose…</option>
-                      <option value="hard">Hard</option>
-                      <option value="easy">Easy</option>
-                    </select>
-                  </div>
-                </div>
-                <label htmlFor={`${id}-category`}>
-                  CATEGORY (ONLY USED FOR FILE-PROVIDED SET DEFAULTS)
-                </label>
-                <select
-                  id={`${id}-category`}
-                  value={row.category}
-                  onChange={(e) => {
-                    const category = e.target.value as DraftExercise['category'];
-                    update(row.id, {
-                      category,
-                      ...(row.sets === null
-                        ? {
-                            sets:
-                              category === 'compound'
-                                ? row.compoundSets
-                                : category === 'isolation'
-                                  ? row.isolationSets
-                                  : null,
-                          }
-                        : {}),
-                    });
-                  }}
-                >
-                  <option value="">Not specified</option>
-                  <option value="compound">Compound</option>
-                  <option value="isolation">Isolation</option>
-                </select>
-                <div className="import-grid">
-                  <div>
-                    <label htmlFor={`${id}-sets`}>SETS</label>
+                  <span className="review-set-count">
+                    {row.sets ?? '?'} sets{ambiguous ? ' ⚠' : ''}
+                  </span>
+                </summary>
+                <p className="eyebrow">
+                  Week {row.week} · {row.day || 'Day unspecified'} · SESSION{' '}
+                  {row.intensity.toUpperCase() || 'UNASSIGNED'}
+                </p>
+                {row.setPrescriptions.length ? (
+                  <ol className="set-prescription-list">
+                    {row.setPrescriptions.map((s, i) => (
+                      <li key={i}>
+                        <b>Set {s.number ?? '?'}</b>
+                        <span>
+                          {repsLabel(s)} reps · {s.effort || 'Effort unspecified'}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="muted">
+                    {row.reps ? `${row.reps} reps` : 'Reps unspecified'} ·{' '}
+                    {row.rest === null ? 'Rest unspecified' : `${row.rest}s rest`}
+                  </p>
+                )}
+                {row.alternatives.length > 0 && (
+                  <p className="muted">
+                    Alternatives (no choice made): {row.alternatives.join(' OR ')}
+                  </p>
+                )}
+                {row.warnings.length > 0 && (
+                  <ul className="parser-notices">
+                    {row.warnings.map((w, i) => (
+                      <li key={i}>{w.replace(/^\[Sets\] /, '')}</li>
+                    ))}
+                  </ul>
+                )}
+                <details className="exercise-editor">
+                  <summary>
+                    {ambiguous ? 'Resolve warnings / edit details' : 'Edit exercise details'}
+                  </summary>
+                  <fieldset disabled={busy}>
+                    <label htmlFor={`${id}-name`}>EXERCISE NAME</label>
                     <input
-                      id={`${id}-sets`}
-                      type="number"
-                      min={1}
-                      max={12}
-                      value={row.sets ?? ''}
-                      onChange={(e) =>
-                        update(row.id, {
-                          sets: e.target.value === '' ? null : Number(e.target.value),
-                        })
-                      }
+                      id={`${id}-name`}
+                      value={row.name}
+                      onChange={(e) => update(row.id, { name: e.target.value })}
                     />
-                  </div>
-                  <div>
+                    <div className="import-grid">
+                      <div>
+                        <label htmlFor={`${id}-workout`}>WORKOUT ASSIGNMENT</label>
+                        <select
+                          id={`${id}-workout`}
+                          value={row.workout}
+                          onChange={(e) =>
+                            update(row.id, { workout: e.target.value as WorkoutId | '' })
+                          }
+                        >
+                          <option value="">Assign…</option>
+                          {workouts.map((w) => (
+                            <option key={w.key} value={w.key}>
+                              {w.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor={`${id}-intensity`}>SESSION INTENSITY</label>
+                        <select
+                          id={`${id}-intensity`}
+                          value={row.intensity}
+                          onChange={(e) =>
+                            update(row.id, { intensity: e.target.value as Intensity | '' })
+                          }
+                        >
+                          <option value="">Choose…</option>
+                          <option value="hard">Hard</option>
+                          <option value="easy">Easy</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="import-grid">
+                      <div>
+                        <label htmlFor={`${id}-individual`}>EXERCISE INTENSITY</label>
+                        <input
+                          id={`${id}-individual`}
+                          value={row.exerciseIntensity}
+                          onChange={(e) => update(row.id, { exerciseIntensity: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor={`${id}-day`}>TRAINING DAY</label>
+                        <input
+                          id={`${id}-day`}
+                          value={row.day}
+                          onChange={(e) => update(row.id, { day: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={row.optional}
+                        onChange={(e) => update(row.id, { optional: e.target.checked })}
+                      />
+                      Optional exercise
+                    </label>
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={!row.excluded}
+                        onChange={(e) => update(row.id, { excluded: !e.target.checked })}
+                      />
+                      Include this exercise
+                    </label>
+                    {row.setPrescriptions.length > 0 ? (
+                      <div>
+                        {row.setPrescriptions.map((s, i) => (
+                          <div className="set-prescription-editor" key={i}>
+                            <label>
+                              Set number
+                              <input
+                                aria-label={`Set entry ${i + 1} number`}
+                                type="number"
+                                value={s.number ?? ''}
+                                onChange={(e) =>
+                                  editSet(row, i, {
+                                    number: e.target.value ? Number(e.target.value) : null,
+                                  })
+                                }
+                              />
+                            </label>
+                            <label>
+                              Min reps
+                              <input
+                                aria-label={`Set entry ${i + 1} minimum reps`}
+                                type="number"
+                                value={s.minReps ?? ''}
+                                onChange={(e) =>
+                                  editSet(row, i, {
+                                    minReps: e.target.value ? Number(e.target.value) : null,
+                                  })
+                                }
+                              />
+                            </label>
+                            <label>
+                              Max reps
+                              <input
+                                aria-label={`Set entry ${i + 1} maximum reps`}
+                                type="number"
+                                value={s.maxReps ?? ''}
+                                onChange={(e) =>
+                                  editSet(row, i, {
+                                    maxReps: e.target.value ? Number(e.target.value) : null,
+                                  })
+                                }
+                              />
+                            </label>
+                            <label>
+                              Effort
+                              <input
+                                aria-label={`Set entry ${i + 1} effort`}
+                                value={s.effort}
+                                onChange={(e) => editSet(row, i, { effort: e.target.value })}
+                              />
+                            </label>
+                            <div className="prescription-edit-actions">
+                              <button
+                                disabled={i === 0}
+                                onClick={() => {
+                                  const sets = [...row.setPrescriptions];
+                                  [sets[i - 1], sets[i]] = [sets[i], sets[i - 1]];
+                                  replaceSets(row, sets);
+                                }}
+                              >
+                                Move set up
+                              </button>
+                              <button
+                                onClick={() =>
+                                  replaceSets(
+                                    row,
+                                    row.setPrescriptions.filter((_, j) => j !== i),
+                                  )
+                                }
+                              >
+                                Remove entry
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        <button
+                          onClick={() =>
+                            replaceSets(row, [
+                              ...row.setPrescriptions,
+                              {
+                                number: null,
+                                minReps: null,
+                                maxReps: null,
+                                effort: '',
+                                source: 'Manually added',
+                              },
+                            ])
+                          }
+                        >
+                          Add prescription set
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="import-grid">
+                        <div>
+                          <label htmlFor={`${id}-sets`}>SETS</label>
+                          <input
+                            id={`${id}-sets`}
+                            type="number"
+                            min={1}
+                            max={12}
+                            value={row.sets ?? ''}
+                            onChange={(e) =>
+                              update(row.id, {
+                                sets: e.target.value ? Number(e.target.value) : null,
+                              })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor={`${id}-reps`}>TARGET REPS</label>
+                          <input
+                            id={`${id}-reps`}
+                            value={row.reps}
+                            onChange={(e) => update(row.id, { reps: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {row.sets === null && (
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={row.allowUnspecifiedSets}
+                          onChange={(e) =>
+                            update(row.id, { allowUnspecifiedSets: e.target.checked })
+                          }
+                        />
+                        Keep set count unspecified
+                      </label>
+                    )}
+                    {!row.reps && !row.setPrescriptions.length && (
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={row.allowUnspecifiedReps}
+                          onChange={(e) =>
+                            update(row.id, { allowUnspecifiedReps: e.target.checked })
+                          }
+                        />
+                        Keep reps unspecified — do not invent a target
+                      </label>
+                    )}
                     <label htmlFor={`${id}-rest`}>REST (SECONDS)</label>
                     <input
                       id={`${id}-rest`}
                       type="number"
-                      min={1}
-                      max={3600}
                       value={row.rest ?? ''}
                       onChange={(e) =>
-                        update(row.id, {
-                          rest: e.target.value === '' ? null : Number(e.target.value),
-                        })
+                        update(row.id, { rest: e.target.value ? Number(e.target.value) : null })
                       }
                     />
-                  </div>
-                </div>
-                <label htmlFor={`${id}-reps`}>TARGET REPS / REP RANGE</label>
-                <input
-                  id={`${id}-reps`}
-                  value={row.reps}
-                  onChange={(e) => update(row.id, { reps: e.target.value })}
-                />
-                {!row.reps.trim() && (
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={row.allowUnspecifiedReps}
-                      onChange={(e) => update(row.id, { allowUnspecifiedReps: e.target.checked })}
+                    {row.rest === null && (
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={row.allowUnspecifiedRest}
+                          onChange={(e) =>
+                            update(row.id, { allowUnspecifiedRest: e.target.checked })
+                          }
+                        />
+                        Keep rest unspecified
+                      </label>
+                    )}
+                    <label htmlFor={`${id}-notes`}>NOTES / SOURCE DETAILS</label>
+                    <textarea
+                      id={`${id}-notes`}
+                      rows={3}
+                      value={row.notes}
+                      onChange={(e) => update(row.id, { notes: e.target.value })}
                     />
-                    Keep reps unspecified — do not invent a target
-                  </label>
-                )}
-                <label htmlFor={`${id}-notes`}>NOTES / OTHER PRESCRIPTION DETAILS</label>
-                <textarea
-                  id={`${id}-notes`}
-                  rows={3}
-                  value={row.notes}
-                  onChange={(e) => update(row.id, { notes: e.target.value })}
-                />
-                {row.warnings.length > 0 && (
-                  <>
-                    <ul className="parser-notices">
-                      {row.warnings.map((w, i) => (
-                        <li key={i}>{w}</li>
-                      ))}
-                    </ul>
-                    <label className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={row.reviewed}
-                        onChange={(e) => update(row.id, { reviewed: e.target.checked })}
-                      />
-                      I reviewed the source and resolved these ambiguities above
-                    </label>
-                  </>
-                )}
-                {!row.excluded && problems.length > 0 && (
-                  <ul className="import-warning" aria-label={`Issues for exercise ${index + 1}`}>
+                    <div className="row">
+                      <button disabled={index === 0} onClick={() => move(row, -1)}>
+                        Move up
+                      </button>
+                      <button
+                        disabled={index === displayed.length - 1}
+                        onClick={() => move(row, 1)}
+                      >
+                        Move down
+                      </button>
+                    </div>
+                  </fieldset>
+                </details>
+                {problems.length > 0 && (
+                  <ul className="import-warning">
                     {problems.map((p) => (
                       <li key={p}>{p}</li>
                     ))}
                   </ul>
                 )}
-                <div className="row">
-                  <button
-                    disabled={busy || index === 0}
-                    aria-label={`Move exercise ${index + 1} up`}
-                    onClick={() => reorder(index, -1)}
-                  >
-                    ↑ Move up
-                  </button>
-                  <button
-                    disabled={busy || index === draft.rows.length - 1}
-                    aria-label={`Move exercise ${index + 1} down`}
-                    onClick={() => reorder(index, 1)}
-                  >
-                    Move down ↓
-                  </button>
-                </div>
-              </fieldset>
+                {row.warnings.length > 0 && (
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={row.reviewed}
+                      onChange={(e) => update(row.id, { reviewed: e.target.checked })}
+                    />
+                    I reviewed these source warnings; keep unedited values exactly as written
+                  </label>
+                )}
+              </details>
             );
           })}
-          <button
-            className="full"
-            disabled={busy}
-            onClick={() => {
-              setConfirmed(false);
-              setApplied(false);
-              setDraft((d) =>
-                d
-                  ? {
-                      ...d,
-                      rows: [
-                        ...d.rows,
-                        {
-                          id: crypto.randomUUID(),
-                          line: 0,
-                          source: 'Manually added',
-                          name: '',
-                          workout: '',
-                          intensity: '',
-                          category: '',
-                          sets: null,
-                          reps: '',
-                          rest: null,
-                          notes: '',
-                          compoundSets: null,
-                          isolationSets: null,
-                          allowUnspecifiedReps: false,
-                          reviewed: false,
-                          excluded: false,
-                          warnings: [],
-                        },
-                      ],
-                    }
-                  : d,
-              );
-            }}
-          >
-            + Add exercise to preview
-          </button>
           <div className="import-summary">
-            <h3>Templates to replace</h3>
+            <h3>Templates to apply</h3>
             {Object.keys(groups).length ? (
               <ul>
                 {Object.entries(groups).map(([key, rows]) => (
                   <li key={key}>
-                    {templateLabel(key)} · {key.endsWith(' · Easy') ? 'Easy' : 'Hard'} —{' '}
-                    {rows.length} exercises
+                    {templateLabel(key)} · {rows.length} exercises
                   </li>
                 ))}
               </ul>
             ) : (
               <p className="muted">
-                Resolve the missing fields and warnings to see the final replacement list.
+                Resolve or explicitly review flagged ambiguities across all sessions before
+                applying.
               </p>
             )}
             <p className="muted">
-              Only these workout/intensity templates will change. Other templates, history, personal
-              records and active sessions stay intact. A pre-import snapshot will be saved on this
-              device.
+              History, PRs and active sessions stay intact. Unspecified rests and set counts stay
+              unset. A pre-import snapshot is saved.
             </p>
           </div>
           <label className="checkbox-label">
@@ -442,7 +664,7 @@ export function PlanImporter({ onApply }: Props) {
               disabled={busy || stale || issues.length > 0 || !included.length}
               onChange={(e) => setConfirmed(e.target.checked)}
             />
-            I confirm replacing the listed workout templates with this preview
+            I confirm applying these templates, preserving all unspecified values as unset
           </label>
           <button
             className="primary full"

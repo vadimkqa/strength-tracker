@@ -1,5 +1,5 @@
 import { useImperativeHandle, useLayoutEffect, useRef, type Ref } from 'react';
-import { workouts, templateKey } from './workouts';
+import { workouts, templateKey, type Rotation } from './workouts';
 import type { Plan } from './templates';
 export interface CarouselHandle {
   select: (index: number) => void;
@@ -10,8 +10,18 @@ interface Props {
   onSelect: (index: number) => void;
   plan: Plan;
   week: string;
+  rotation?: Rotation;
+  rotationWeek?: number;
 }
-export function WorkoutCarousel({ selected, onSelect, plan, week, ref }: Props) {
+export function WorkoutCarousel({
+  selected,
+  onSelect,
+  plan,
+  week,
+  ref,
+  rotation,
+  rotationWeek,
+}: Props) {
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
   const track = useRef<HTMLDivElement>(null);
@@ -117,7 +127,14 @@ export function WorkoutCarousel({ selected, onSelect, plan, week, ref }: Props) 
         {items.map((c, slot) => {
           const clone = slot === 0 || slot === items.length - 1;
           const i = logical(slot);
-          const rows = plan[templateKey(c.key, week)] || plan[c.key] || [];
+          const session = rotation?.sessions.find(
+            (s) => s.week === rotationWeek && s.workout === c.key,
+          );
+          const rows = rotation
+            ? session
+              ? plan[session.key] || []
+              : []
+            : plan[templateKey(c.key, week)] || plan[c.key] || [];
           return (
             <article
               key={slot}
