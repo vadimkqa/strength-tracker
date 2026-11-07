@@ -20,7 +20,9 @@ test('layered mobile cards show rotation metadata, side taps select the front wo
   await expect(front.locator('.stack-intensity')).toHaveText('HEAVY');
   await expect(page.locator('.stack-previous')).toHaveCount(1);
   await expect(page.locator('.stack-next')).toHaveCount(1);
-  await page.screenshot({ path: 'test-results/playing-card-home-rotation.png', fullPage: true });
+  await page.evaluate(() => scrollTo(0, document.body.scrollHeight - innerHeight));
+  await page.screenshot({ path: 'test-results/playing-card-home-rotation.png' });
+  await page.locator('.playing-stack').scrollIntoViewIfNeeded();
   const next = await page.locator('.stack-next').boundingBox();
   await page.touchscreen.tap(
     Math.min(386, next!.x + next!.width - 8),
