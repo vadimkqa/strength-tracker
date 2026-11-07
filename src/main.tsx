@@ -271,8 +271,7 @@ function App() {
                   <p className="eyebrow">BUILD YOUR STRONGER SELF</p>
                   <h1>
                     Make every
-                    <br />
-                    <em>rep count.</em>
+                    <br /> <em>rep count.</em>
                   </h1>
                   <p>Choose your focus. Set your pace.</p>
                 </div>
@@ -312,6 +311,17 @@ function App() {
                   rotation={data.rotation}
                   rotationWeek={data.rotationWeek || 1}
                 />
+                <div className="pagination" aria-label="Choose workout">
+                  {cards.map((c, i) => (
+                    <button
+                      key={c.name}
+                      aria-label={`Select ${c.name}`}
+                      aria-current={index === i ? 'true' : undefined}
+                      className={index === i ? 'selected' : ''}
+                      onClick={() => carousel.current?.select(i)}
+                    />
+                  ))}
+                </div>
                 <div className="intensity">
                   <span className="eyebrow">TRAINING INTENSITY</span>
                   <div className="segmented" role="group" aria-label="Training intensity">
@@ -367,17 +377,6 @@ function App() {
                 >
                   START WORKOUT <span>→</span>
                 </button>
-                <div className="pagination" aria-label="Choose workout">
-                  {cards.map((c, i) => (
-                    <button
-                      key={c.name}
-                      aria-label={`Select ${c.name}`}
-                      aria-current={index === i ? 'true' : undefined}
-                      className={index === i ? 'selected' : ''}
-                      onClick={() => carousel.current?.select(i)}
-                    />
-                  ))}
-                </div>
                 <p className="footnote">Your training. Your data. Always with you.</p>
               </>
             ) : (

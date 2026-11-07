@@ -1,4 +1,4 @@
-import { useImperativeHandle, useLayoutEffect, useRef, type Ref } from 'react';
+import { useImperativeHandle, useRef, useState, type Ref, type CSSProperties } from 'react';
 import { workouts, templateKey, type Rotation } from './workouts';
 import type { Plan } from './templates';
 export interface CarouselHandle {
@@ -22,156 +22,153 @@ export function WorkoutCarousel({
   rotation,
   rotationWeek,
 }: Props) {
-  const selectedRef = useRef(selected);
-  selectedRef.current = selected;
-  const track = useRef<HTMLDivElement>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const drag = useRef<{ x: number; scroll: number; pointer: number } | null>(null);
-  const items = [workouts[3], ...workouts, workouts[0]];
-  const logical = (slot: number) => (slot - 1 + workouts.length) % workouts.length;
-  function nearest() {
-    const el = track.current!;
-    const center = el.getBoundingClientRect().left + el.clientWidth / 2;
-    let slot = 1,
-      distance = Infinity;
-    Array.from(el.children).forEach((child, i) => {
-      const rect = child.getBoundingClientRect();
-      const delta = Math.abs(rect.left + rect.width / 2 - center);
-      if (delta < distance) {
-        slot = i;
-        distance = delta;
-      }
-    });
-    return slot;
-  }
-  function move(slot: number, smooth = true) {
-    const el = track.current,
-      child = el?.children[slot] as HTMLElement | undefined;
-    if (!el || !child) return;
-    el.scrollTo({
-      left: child.offsetLeft + child.offsetWidth / 2 - el.clientWidth / 2,
-      behavior:
-        smooth && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'instant',
-    });
-  }
-  useLayoutEffect(() => {
-    move(selected + 1, false);
-    const observer = new ResizeObserver(() => move(selectedRef.current + 1, false));
-    if (track.current) observer.observe(track.current);
-    return () => {
-      observer.disconnect();
-      clearTimeout(timer.current);
-    };
-    // Selection is driven by scrolling; only mount/resizing should reposition instantly.
-  }, []);
-  const choose = (i: number) => {
-    const slot =
-      selected === 0 && i === 3 ? 0 : selected === 3 && i === 0 ? items.length - 1 : i + 1;
-    move(slot);
+  const gesture = useRef<{
+    x: number;
+    y: number;
+    dx: number;
+    index: number | null;
+    id: number;
+  } | null>(null);
+  const suppressClick = useRef(false);
+  const [offset, setOffset] = useState(0);
+  const choose = (index: number) => {
+    setOffset(0);
+    onSelect((index + 4) % 4);
   };
   useImperativeHandle(ref, () => ({ select: choose }));
-  function settle() {
-    if (drag.current) return;
-    const slot = nearest();
-    onSelect(logical(slot));
-    if (slot === 0 || slot === items.length - 1) move(logical(slot) + 1, false);
-  }
   return (
-    <div className="carousel-shell">
+    <div className="carousel-shell playing-stack-shell">
       <div
-        className="carousel"
-        ref={track}
+        className="carousel playing-stack"
         role="region"
         aria-roledescription="carousel"
         aria-label="Workout selection"
         tabIndex={0}
         onKeyDown={(e) => {
-          if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+          if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
             e.preventDefault();
-            choose((selected + (e.key === 'ArrowRight' ? 1 : 3)) % 4);
+            choose(selected + (e.key === 'ArrowRight' ? 1 : -1));
           }
-        }}
-        onScroll={() => {
-          if (!track.current) return;
-          onSelect(logical(nearest()));
-          clearTimeout(timer.current);
-          timer.current = setTimeout(settle, 160);
         }}
         onPointerDown={(e) => {
-          if (e.pointerType !== 'mouse' || e.button !== 0) return;
-          e.preventDefault();
-          clearTimeout(timer.current);
-          drag.current = { x: e.clientX, scroll: e.currentTarget.scrollLeft, pointer: e.pointerId };
+          if (e.button !== 0) return;
+          if (e.pointerType === 'mouse') e.preventDefault();
+          suppressClick.current = false;
+          const card = (e.target as HTMLElement).closest<HTMLElement>('[data-card-index]');
+          gesture.current = {
+            x: e.clientX,
+            y: e.clientY,
+            dx: 0,
+            index: card ? Number(card.dataset.cardIndex) : null,
+            id: e.pointerId,
+          };
           e.currentTarget.setPointerCapture(e.pointerId);
-          e.currentTarget.classList.add('dragging');
         }}
         onPointerMove={(e) => {
-          if (!drag.current || e.pointerId !== drag.current.pointer) return;
-          e.currentTarget.scrollLeft = drag.current.scroll - (e.clientX - drag.current.x);
+          const g = gesture.current;
+          if (!g || g.id !== e.pointerId) return;
+          g.dx = e.clientX - g.x;
+          if (Math.abs(g.dx) > Math.abs(e.clientY - g.y))
+            setOffset(Math.max(-90, Math.min(90, g.dx)));
         }}
         onPointerUp={(e) => {
-          if (!drag.current) return;
-          drag.current = null;
-          e.currentTarget.classList.remove('dragging');
-          e.currentTarget.releasePointerCapture(e.pointerId);
-          move(nearest());
+          const g = gesture.current;
+          if (!g) return;
+          gesture.current = null;
+          suppressClick.current = Math.abs(g.dx) > 8;
+          setOffset(0);
+          if (Math.abs(g.dx) > 45 && Math.abs(g.dx) > Math.abs(e.clientY - g.y))
+            choose(selected + (g.dx < 0 ? 1 : -1));
+          else if (Math.abs(g.dx) < 8 && Math.abs(e.clientY - g.y) < 8 && g.index !== null)
+            choose(g.index);
+          if (e.currentTarget.hasPointerCapture(e.pointerId))
+            e.currentTarget.releasePointerCapture(e.pointerId);
         }}
-        onPointerCancel={(e) => {
-          if (e.pointerType === 'mouse') {
-            drag.current = null;
-            e.currentTarget.classList.remove('dragging');
-            move(nearest());
-          }
+        onPointerCancel={() => {
+          gesture.current = null;
+          setOffset(0);
         }}
       >
-        {items.map((c, slot) => {
-          const clone = slot === 0 || slot === items.length - 1;
-          const i = logical(slot);
+        {workouts.map((card, index) => {
+          const distance = (index - selected + 4) % 4;
+          const position =
+            distance === 0
+              ? 'front'
+              : distance === 1
+                ? 'next'
+                : distance === 3
+                  ? 'previous'
+                  : 'back';
           const session = rotation?.sessions.find(
-            (s) => s.week === rotationWeek && s.workout === c.key,
+            (s) => s.week === rotationWeek && s.workout === card.key,
           );
           const rows = rotation
             ? session
               ? plan[session.key] || []
               : []
-            : plan[templateKey(c.key, week)] || plan[c.key] || [];
+            : plan[templateKey(card.key, week)] || plan[card.key] || [];
+          const day = session?.day || (rotation ? 'Unscheduled' : card.key.split(' · ')[0]);
+          const intensity = session?.intensity || (week === 'easy' ? 'easy' : 'hard');
+          const cores = rows.filter((r) => r[3]?.kind === 'core' || /^core\b/i.test(r[0])).length,
+            optional = rows.filter((r) => r[3]?.optional).length;
           return (
             <article
-              key={slot}
-              className={`workout-card ${selected === i ? 'selected' : ''}`}
-              aria-label={clone ? undefined : c.name}
-              aria-hidden={clone || undefined}
+              key={card.key}
+              data-card-index={index}
+              className={`workout-card stack-card stack-${position} ${distance === 0 ? 'selected' : ''}`}
+              aria-label={card.name}
+              aria-hidden={position === 'back' || undefined}
+              style={{ '--drag-x': distance === 0 ? `${offset}px` : '0px' } as CSSProperties}
             >
+              <button
+                className="stack-card-select"
+                tabIndex={position === 'back' ? -1 : 0}
+                aria-current={position === 'front' ? 'true' : undefined}
+                aria-label={
+                  position === 'front' ? `Selected ${card.name}` : `Bring ${card.name} to front`
+                }
+                onClick={() => {
+                  if (!suppressClick.current) choose(index);
+                }}
+              />
+              <span className="stack-peek-label" aria-hidden="true">
+                {card.name}
+              </span>
+              <div className="stack-card-top">
+                <span>{day}</span>
+                <span>{rotation ? `Week ${rotationWeek}` : 'YOUR TRAINING'}</span>
+              </div>
               <div className="photo">
                 <img
                   draggable={false}
-                  src={`${import.meta.env.BASE_URL}photos/${c.photo}.jpg`}
-                  alt={clone ? '' : c.caption}
+                  src={`${import.meta.env.BASE_URL}photos/${card.photo}.jpg`}
+                  alt={card.caption}
                 />
-                <span className="photo-number">
-                  0{i + 1} <span>/ TRAINING SPLIT</span>
-                </span>
+                <span className="stack-intensity">{intensity === 'hard' ? 'HEAVY' : 'EASY'}</span>
               </div>
               <div className="card-caption">
-                <p className="eyebrow">{c.muscles}</p>
-                <h2>{c.name}</h2>
+                <p className="eyebrow">{card.muscles}</p>
+                <h2>{card.name}</h2>
                 <div className="card-footer">
-                  <span>{rows.length} exercises</span>
                   <span>
-                    Strength & conditioning <b aria-hidden="true">→</b>
+                    {rows.length} exercises{cores ? ` · ${cores} core` : ''}
+                    {optional ? ` · ${optional} optional` : ''}
                   </span>
+                  <span aria-hidden="true">→</span>
                 </div>
               </div>
             </article>
           );
         })}
       </div>
-      <div className="carousel-arrows">
-        <button aria-label="Previous workout" onClick={() => choose((selected + 3) % 4)}>
+      <div className="carousel-arrows stack-navigation">
+        <button aria-label="Previous workout" onClick={() => choose(selected - 1)}>
           ←
         </button>
-        <span>SWIPE TO EXPLORE</span>
-        <button aria-label="Next workout" onClick={() => choose((selected + 1) % 4)}>
+        <span aria-live="polite">
+          {workouts[selected].name} · {selected + 1} / 4
+        </span>
+        <button aria-label="Next workout" onClick={() => choose(selected + 1)}>
           →
         </button>
       </div>
