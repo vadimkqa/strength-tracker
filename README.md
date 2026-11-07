@@ -46,8 +46,30 @@ Playwright uses the environment's `/usr/bin/chromium`. On another machine, insta
 
 ## Existing behavior and new presentation
 
-The four cards map to the original templates in order: Bench Day → Tuesday Bench focus; DB Press Day → Thursday Back focus; Hammer Press Day → Saturday Chest focus; Leg Day → Sunday Legs. Existing exercise choices and customized plans are preserved rather than silently replaced to match the new names. HARD maps to the original heavy week; EASY retains the original easy-week behavior (the alternate Sunday plan).
+The four cards map to the original templates in order: Bench Day → Tuesday Bench focus; DB Press Day → Thursday Back focus; Hammer Press Day → Saturday Chest focus; Leg Day → Sunday Legs. Existing exercise choices and customized plans are preserved rather than silently replaced to match the new names. HARD maps to the original heavy week; EASY uses a separately imported Easy template when available. Without an imported variant, the original behavior is preserved: the alternate Sunday plan and the existing base templates for other days.
 
-Train contains the swipeable carousel, visible intensity selector, active workouts, set logging, timestamp-based timers, rest presets, exercise edits/additions, and set adjustment. Progress contains saved history and session details. PRs shows highest completed weight per exercise, with reps as the tiebreaker. Settings edits template set counts, default rest, and exports/merges backups. No Phase 2 analytics or programming features are included.
+Train contains the swipeable carousel, visible intensity selector, active workouts, set logging, timestamp-based timers, rest presets, exercise edits/additions, and set adjustment. Progress contains saved history and session details. PRs shows highest completed weight per exercise, with reps as the tiebreaker. Settings edits template set counts, default rest, imports TXT training plans, and exports/merges backups. No Phase 2 analytics or programming features are included.
 
 The original app is retained in `legacy/` for upgrade tests and reference; it is not part of the deployed build. Workout photographs are bundled from the public-domain `yuhonas/free-exercise-db` dataset; source paths are in `public/photos/README.md`. The four-screen mockup image was not attached; the implementation follows the supplied colors, structure, and visual requirements.
+
+## Centered workout carousel and TXT plan importing
+
+The Train carousel centers one large card with both neighbors peeking in. It wraps between the first and last workout and supports native touch swipes, mouse drag, arrow buttons, keyboard left/right arrows, and pagination. EASY/HARD and START WORKOUT stay underneath it.
+
+To review a TXT program:
+
+1. Open **Settings → Import Training Plan** and choose your TXT file, or paste its contents. Files are decoded locally (UTF-8 or UTF-16 with a BOM); maximum 1 MB and 2,000 lines. Nothing is uploaded.
+2. Optionally enter aliases, one per line, such as `Push A = Bench Day`. The four destination names are Bench Day, DB Press Day, Hammer Press Day and Leg Day. The original v1 template names are recognized too. An inline heading such as `Bench Day (aka Push A)` also defines an alias for later headings.
+3. Click **Parse TXT**. Review each exercise name, workout assignment, Hard/Easy variant, set count, rep target, rest in seconds, and notes. Source lines remain available. Use move controls to change order, exclude non-exercise lines explicitly, or add missing exercises.
+4. Fix missing values and acknowledge ambiguity warnings. Exercise categories are never guessed. If the file specifies category defaults (`Compounds: 4 sets; Isolation: 3 sets`), apply them using explicit category labels or manual category selection. Defaults before any workout heading are global; defaults within a workout apply only until the next workout/intensity heading. Missing reps must be supplied or explicitly left unspecified.
+5. Inspect **Templates to replace**, check the explicit confirmation box, then click **Apply imported plan**. Cancelling or leaving a preview unapplied has no effect on saved templates. Editing the source/aliases requires reparsing; editing any preview detail resets confirmation.
+
+Supported examples include `4 x 6–8`, `3 sets of 12 reps`, `sets: 4, reps: 8, rest: 90s`, `rest 1:30`, and `rest 2m 30s`. Exercise continuation lines such as `Sets:`, `Reps:`, `Rest:`, `Tempo:`, `RIR:` and `Notes:` are retained. The full source prescription stays in notes, including details not interpreted by the parser. Ranged or conflicting set/rest prescriptions require review; the parser never invents a single set count or rest duration.
+
+The format example in [examples/training-plan-format.txt](examples/training-plan-format.txt) is illustrative, not a recommendation or a replacement for your own program. It is never applied automatically.
+
+Only the explicitly listed workout/intensity groups are replaced, in the reviewed exercise order. Other templates, workout history (which supplies PRs), preferences, and the active session are preserved. Each confirmed import stores a pre-import snapshot and the new state in one IndexedDB transaction. The original v1 localStorage record remains untouched. Future sessions display imported rep targets and prescription notes; logged reps are never prefilled from a target range.
+
+The parser and draft validation live in `src/plan-import.ts`. They are pure functions returning `PlanDraft`; persistence is isolated in `src/plan-storage.ts`, and the editor is in `src/PlanImporter.tsx`. A future AI adapter can return the same draft shape and must pass the same review/confirmation path. No AI API, credentials, paid service, or backend is used.
+
+Use the same hostname and port on your Mac as before to access your existing browser storage. If changing origins, export a JSON backup first and merge it into the new origin. The automated tests use isolated storage and do not apply sample plans to your personal data.
