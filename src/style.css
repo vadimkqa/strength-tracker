@@ -1305,3 +1305,58 @@ main.home-screen {
   outline-offset: -2px;
   border-radius: 22px;
 }
+/* Keep the stack and its controls close together on phone-sized home screens. */
+@media (max-width: 699px) {
+  main.home-screen {
+    padding-top: calc(16px + env(safe-area-inset-top));
+  }
+  .home-screen header {
+    margin-bottom: 16px;
+  }
+  .home-screen .page-title {
+    margin-bottom: 14px;
+  }
+  .home-screen .page-title h1 {
+    font-size: 28px;
+    line-height: 1.15;
+    margin-bottom: 8px;
+  }
+  .home-screen .page-title h1 br {
+    display: none;
+  }
+  .home-screen .page-title .eyebrow {
+    font-size: 8px;
+    margin-bottom: 7px;
+  }
+  .home-screen .page-title > p:last-child {
+    font-size: 12px;
+  }
+  .home-screen .section-title {
+    margin-top: 14px;
+    margin-bottom: 10px;
+  }
+  .home-screen .rotation-selection {
+    margin-bottom: 12px;
+  }
+  .home-screen .rotation-selection label {
+    margin-top: 10px;
+    margin-bottom: 6px;
+  }
+  .home-screen .rotation-selection select {
+    min-height: 38px;
+    padding: 8px 10px;
+  }
+  .home-screen .rotation-selection p {
+    margin: 4px 0;
+    font-size: 11px;
+  }
+  .home-screen .pagination {
+    margin: 5px 0;
+  }
+  .home-screen .intensity {
+    margin: 12px 0;
+  }
+  .home-screen .footnote {
+    margin-top: 12px;
+  }
+}
