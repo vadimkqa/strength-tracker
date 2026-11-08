@@ -12,6 +12,35 @@ export function bubblePoint(
   const y = Number.isFinite(position.y) ? Math.max(0, Math.min(1, position.y)) : 0.35;
   return { left: bounds.left + x * bounds.width, top: bounds.top + y * bounds.height };
 }
+export function avoidFocusedInput(
+  point: { left: number; top: number },
+  bounds: { left: number; top: number; width: number; height: number },
+  size: number,
+  focus: { left: number; right: number; top: number; bottom: number } | null,
+) {
+  if (!focus) return point;
+  const overlaps = (p: typeof point) =>
+    p.left < focus.right + 8 &&
+    p.left + size > focus.left - 8 &&
+    p.top < focus.bottom + 8 &&
+    p.top + size > focus.top - 8;
+  if (!overlaps(point)) return point;
+  const candidates = [
+    { left: bounds.left, top: bounds.top },
+    { left: bounds.left + bounds.width, top: bounds.top },
+    { left: bounds.left, top: bounds.top + bounds.height },
+    { left: bounds.left + bounds.width, top: bounds.top + bounds.height },
+  ];
+  return (
+    candidates
+      .filter((p) => !overlaps(p))
+      .sort(
+        (a, b) =>
+          Math.hypot(a.left - point.left, a.top - point.top) -
+          Math.hypot(b.left - point.left, b.top - point.top),
+      )[0] || point
+  );
+}
 interface Props {
   controller: WorkoutController;
   now: number;
@@ -24,6 +53,13 @@ export function TimerBubble({ controller, now, save }: Props) {
   const position = controller.bubblePosition || { x: 1, y: 0.35 };
   const [preview, setPreview] = useState<BubblePosition | null>(null),
     [bounds, setBounds] = useState({ left: 8, top: 8, width: 0, height: 0 });
+  const [focusRect, setFocusRect] = useState<{
+    left: number;
+    right: number;
+    top: number;
+    bottom: number;
+  } | null>(null);
+  const [bubbleSize, setBubbleSize] = useState(76);
   useLayoutEffect(() => {
     const measure = () => {
       const vv = window.visualViewport;
@@ -33,6 +69,11 @@ export function TimerBubble({ controller, now, save }: Props) {
       const width = vv?.width || innerWidth,
         height = vv?.height || innerHeight;
       const size = bubble.current?.offsetWidth || 76;
+      setBubbleSize(size);
+      const focused = document.activeElement;
+      setFocusRect(
+        focused?.matches('.active-workout .set-input') ? focused.getBoundingClientRect() : null,
+      );
       const action = document.querySelector('.workout-floating-action')?.getBoundingClientRect();
       const bottom = Math.min((vv?.offsetTop || 0) + height - 8, action?.top ?? height - 150);
       setBounds({
@@ -44,17 +85,24 @@ export function TimerBubble({ controller, now, save }: Props) {
     };
     measure();
     window.addEventListener('resize', measure);
+    window.addEventListener('scroll', measure, { passive: true });
     window.addEventListener('workout-viewport-change', measure);
     window.visualViewport?.addEventListener('resize', measure);
     window.visualViewport?.addEventListener('scroll', measure);
     return () => {
       window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure);
       window.removeEventListener('workout-viewport-change', measure);
       window.visualViewport?.removeEventListener('resize', measure);
       window.visualViewport?.removeEventListener('scroll', measure);
     };
   }, []);
-  const point = bubblePoint(preview || position, bounds);
+  const point = avoidFocusedInput(
+    bubblePoint(preview || position, bounds),
+    bounds,
+    bubbleSize,
+    focusRect,
+  );
   const normalized = (left: number, top: number) => ({
     x: bounds.width ? Math.max(0, Math.min(1, (left - bounds.left) / bounds.width)) : 0,
     y: bounds.height ? Math.max(0, Math.min(1, (top - bounds.top) / bounds.height)) : 0,

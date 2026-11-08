@@ -1,3 +1,5 @@
+import { ExerciseCard } from './ExerciseCard';
+import { syncExerciseCards } from './exercise-cards';
 import { BackupPanel } from './BackupPanel';
 import { BACKUP_FILENAME, restoreDatabaseBackup } from './backup';
 import { resizeTemplateSets } from './importing/saving';
@@ -5,17 +7,7 @@ import type { TrainingProgram } from './importing/model';
 import { carouselIndex, chooseWorkout, chooseWeek, workoutDifficulty } from './carousel-selection';
 import { useKeyboardViewport } from './useKeyboardViewport';
 import { WorkoutScreens } from './WorkoutScreens';
-import {
-  ensureController,
-  reconcile,
-  finalizeLogging,
-  selectSet,
-  skipSet,
-  positions,
-  pendingLogs,
-} from './controller';
-import { exerciseIdentity, addPerformanceSet, setNumber } from './performance';
-import { repsLabel } from './prescriptions';
+import { ensureController, reconcile, finalizeLogging, pendingLogs } from './controller';
 import { saveImportedPlan } from './plan-storage';
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -95,9 +87,12 @@ function App() {
     const initialize = async () => {
       try {
         const d = await loadData();
-        if (d.active && !d.active.controller) {
-          d.active = ensureController(d.active);
-          await saveData(d);
+        if (d.active) {
+          const repaired = ensureController(d.active);
+          if (JSON.stringify(repaired) !== JSON.stringify(d.active)) {
+            d.active = repaired;
+            await saveData(d);
+          }
         }
         if (alive) {
           current.current = d;
@@ -166,7 +161,11 @@ function App() {
             const w = ensureController(fn(ensureController(d.active)));
             finalizeLogging(w);
             reconcile(w);
-            return w;
+            const focused = document.activeElement;
+            const editing = focused?.matches('input,textarea,select')
+              ? focused.closest<HTMLElement>('[data-exercise-id]')?.dataset.exerciseId
+              : undefined;
+            return syncExerciseCards(d.active, w, editing);
           })()
         : null,
     }));
@@ -440,24 +439,8 @@ function App() {
                         label(active.name)}
                     </h1>
                   </div>
-                  <span className="live-dot">●</span>
-                </div>
-                <WorkoutScreens
-                  workout={active}
-                  now={now}
-                  change={activeChange}
-                  finish={() => {
-                    if (confirm('Finish and save this workout?')) {
-                      change((d) => finishWorkout(d));
-                      setTab('Progress');
-                    }
-                  }}
-                >
-                  <p className="workout-duration muted">
-                    Workout duration: {formatTime((now - active.started) / 1000)}
-                  </p>
-                  <div className="section-title">
-                    <h2>Exercises</h2>
+                  <div className="active-workout-tools">
+                    {' '}
                     <button
                       onClick={() => {
                         const name = prompt('New exercise name');
@@ -479,296 +462,30 @@ function App() {
                       + Add
                     </button>
                   </div>
-                  {active.exercises.map((ex, i) => {
-                    return (
-                      <section
-                        className={`card exercise ${active.controller?.selected?.exerciseId === ex.id ? 'active-exercise' : ''}`}
-                        key={ex.id || i}
-                      >
-                        <div className="row">
-                          <div>
-                            <h3>{ex.name}</h3>
-                            <button
-                              className="small"
-                              onClick={() =>
-                                activeChange((w) => {
-                                  const e = w.exercises[i];
-                                  const target =
-                                    e.sets.find((s) => !s.done && !s.skipped && !s.needsLogging) ||
-                                    e.sets[0];
-                                  if (target) selectSet(w, { exerciseId: e.id, setId: target.id! });
-                                  return w;
-                                })
-                              }
-                            >
-                              Select exercise
-                            </button>
-                            <button
-                              className="small"
-                              onClick={() =>
-                                activeChange((w) => {
-                                  const e = w.exercises[i];
-                                  if (w.controller?.running?.exerciseId === e.id)
-                                    throw Error('Stop the active set first.');
-                                  e.skipped = !e.skipped;
-                                  for (const s of e.sets)
-                                    if (!s.done) {
-                                      s.skipped = e.skipped;
-                                      s.needsLogging = false;
-                                    }
-                                  w.controller!.selected = positions(w)[0] || null;
-                                  if (!e.skipped && e.sets.length)
-                                    w.controller!.selected = {
-                                      exerciseId: e.id,
-                                      setId: (e.sets.find((s) => !s.done)?.id || e.sets[0]?.id)!,
-                                    };
-                                  reconcile(w);
-                                  return w;
-                                })
-                              }
-                            >
-                              {ex.skipped ? 'Include exercise' : 'Skip exercise'}
-                            </button>
-                            <p className="muted">
-                              {ex.rest === null ? 'Rest unspecified' : `${ex.rest}s rest`}
-                            </p>
-                          </div>
-                          <button
-                            aria-label={`Edit ${ex.name}`}
-                            onClick={() => {
-                              const name = prompt('Exercise name', ex.name);
-                              if (name === null) return;
-                              const rest = prompt(
-                                'Rest between sets (seconds)',
-                                ex.rest === null ? '' : String(ex.rest),
-                              );
-                              activeChange((w) => {
-                                w.exercises[i].name = name.trim() || ex.name;
-                                if (
-                                  exerciseIdentity(w.exercises[i].name) !==
-                                  exerciseIdentity(ex.name)
-                                ) {
-                                  w.exercises[i].exerciseKey = exerciseIdentity(
-                                    w.exercises[i].name,
-                                  );
-                                  delete w.exercises[i].previousPerformance;
-                                }
-                                if (rest && Number.isFinite(Number(rest)) && Number(rest) > 0)
-                                  w.exercises[i].rest = Math.min(3600, Math.round(Number(rest)));
-                                return w;
-                              });
-                            }}
-                          >
-                            Edit
-                          </button>
-                        </div>
-                        {(ex.exerciseIntensity || ex.optional) && (
-                          <p className="eyebrow">
-                            {ex.exerciseIntensity}
-                            {ex.optional ? ' · OPTIONAL' : ''}
-                          </p>
-                        )}
-                        {ex.groupLabel && <p className="eyebrow">{ex.groupLabel}</p>}
-                        {ex.alternatives?.length ? (
-                          <p className="muted">Alternatives: {ex.alternatives.join(' OR ')}</p>
-                        ) : null}
-                        {ex.sets.length === 0 && (
-                          <p className="muted">
-                            Set count unspecified. Add sets only as you choose to perform them.
-                          </p>
-                        )}
-                        {ex.targetReps && (
-                          <p className="muted prescription">Target: {ex.targetReps} reps</p>
-                        )}
-                        {ex.notes && (
-                          <details className="prescription-notes">
-                            <summary>Plan notes</summary>
-                            <p>{ex.notes}</p>
-                          </details>
-                        )}
-                        {ex.sets.map((s, j) => (
-                          <div
-                            className={`setrow performance-row ${s.done ? 'done' : ''} ${s.needsLogging ? 'needs-logging' : ''} ${active.controller?.selected?.setId === s.id || active.controller?.running?.setId === s.id ? 'active-set' : ''}`}
-                            key={j}
-                          >
-                            <button
-                              className="select-set"
-                              aria-label={`Select ${ex.name} set ${j + 1}`}
-                              onClick={() =>
-                                activeChange((w) => {
-                                  selectSet(w, { exerciseId: ex.id, setId: s.id! });
-                                  return w;
-                                })
-                              }
-                            >
-                              {s.prescription ? (s.prescription.number ?? '?') : j + 1}
-                            </button>
-                            {(['weight', 'reps'] as const).map((field) => (
-                              <input
-                                key={field}
-                                aria-label={`${field === 'weight' ? 'Weight' : 'Reps'} ${ex.name} set ${j + 1}`}
-                                type="number"
-                                inputMode={field === 'weight' ? 'decimal' : 'numeric'}
-                                min="0"
-                                step={field === 'weight' ? '0.5' : '1'}
-                                value={s[field]}
-                                onChange={(e) =>
-                                  activeChange((w) => {
-                                    w.exercises[i].sets[j][field] = e.target.value;
-                                    return w;
-                                  })
-                                }
-                              />
-                            ))}
-                            <button
-                              className={
-                                active.controller?.phase === 'set' &&
-                                active.controller.running?.setId === s.id
-                                  ? 'check in-progress'
-                                  : s.done
-                                    ? 'check done'
-                                    : 'check'
-                              }
-                              aria-busy={
-                                (active.controller?.phase === 'set' &&
-                                  active.controller.running?.setId === s.id) ||
-                                undefined
-                              }
-                              aria-label={`${s.done ? 'Undo' : 'Complete'} ${ex.name} set ${j + 1}`}
-                              aria-pressed={s.done}
-                              onClick={() =>
-                                activeChange((w) => {
-                                  const s = w.exercises[i].sets[j];
-                                  if (w.controller?.running?.setId === s.id)
-                                    throw Error('Use STOP SET to preserve timing.');
-                                  if (
-                                    !s.done &&
-                                    (!s.reps ||
-                                      Number(s.reps) <= 0 ||
-                                      !Number.isInteger(Number(s.reps)))
-                                  )
-                                    throw Error(
-                                      'Enter valid weight and positive whole-number reps first.',
-                                    );
-                                  s.done = !s.done;
-                                  s.needsLogging = false;
-                                  if (w.controller!.selected?.setId === s.id && s.done)
-                                    w.controller!.selected = positions(w)[0] || null;
-                                  if (!s.done)
-                                    w.controller!.selected = {
-                                      exerciseId: w.exercises[i].id,
-                                      setId: s.id!,
-                                    };
-                                  return w;
-                                })
-                              }
-                            >
-                              {active.controller?.phase === 'set' &&
-                              active.controller.running?.setId === s.id ? (
-                                <span
-                                  className="set-spinner"
-                                  role="status"
-                                  aria-label="Set in progress"
-                                />
-                              ) : s.done ? (
-                                '✓'
-                              ) : (
-                                '○'
-                              )}
-                            </button>
-                            <button
-                              className="skip-set"
-                              aria-label={`${s.skipped ? 'Include' : 'Skip'} ${ex.name} set ${j + 1}`}
-                              title={s.skipped ? 'Include set' : 'Skip set'}
-                              onClick={() =>
-                                activeChange((w) => {
-                                  const target = w.exercises[i].sets[j];
-                                  if (target.skipped) {
-                                    target.skipped = false;
-                                    selectSet(w, { exerciseId: ex.id, setId: target.id! });
-                                  } else skipSet(w, { exerciseId: ex.id, setId: target.id! });
-                                  return w;
-                                })
-                              }
-                            >
-                              <span aria-hidden="true">{s.skipped ? '↩' : '↷'}</span>
-                            </button>
-                            <div className="set-details">
-                              <span className="previous-set">
-                                {(() => {
-                                  const n = setNumber(s, j);
-                                  const last =
-                                    n === null ? undefined : ex.previousPerformance?.sets[n];
-                                  return last
-                                    ? `Last: ${last.weight} kg × ${last.reps}`
-                                    : 'No previous performance';
-                                })()}
-                              </span>
-                              {s.prescription && (
-                                <small className="prescription-per-set">
-                                  Set {s.prescription.number ?? '?'}: {repsLabel(s.prescription)}{' '}
-                                  reps · {s.prescription.effort}
-                                  {s.prescription.targetWeight &&
-                                    ` · ${s.prescription.targetWeight.value} ${s.prescription.targetWeight.unit}`}
-                                  {s.prescription.targetRpe != null &&
-                                    ` · RPE ${s.prescription.targetRpe}`}
-                                  {s.prescription.targetRir != null &&
-                                    ` · RIR ${s.prescription.targetRir}`}
-                                  {s.prescription.restSeconds != null &&
-                                    ` · Rest ${s.prescription.restSeconds}s`}
-                                </small>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                        <div className="set-adjust compact-set-adjust">
-                          <div>
-                            <button
-                              aria-label={`Remove set from ${ex.name}`}
-                              disabled={ex.sets.length <= 1}
-                              onClick={() => {
-                                if (
-                                  ex.sets.at(-1)?.done &&
-                                  !confirm('Remove the last completed set?')
-                                )
-                                  return;
-                                activeChange((w) => {
-                                  if (
-                                    w.controller?.running?.setId === w.exercises[i].sets.at(-1)?.id
-                                  )
-                                    throw Error('Stop the active set before removing it.');
-                                  w.exercises[i].sets.pop();
-                                  return w;
-                                });
-                              }}
-                            >
-                              −
-                            </button>
-                            <button
-                              aria-label={`Add set to ${ex.name}`}
-                              disabled={ex.sets.length >= 12}
-                              onClick={() =>
-                                activeChange((w) => {
-                                  const exercise = w.exercises[i];
-                                  addPerformanceSet(exercise);
-                                  const added = exercise.sets.at(-1)!;
-                                  added.id = crypto.randomUUID();
-                                  if (!w.controller!.selected)
-                                    w.controller!.selected = {
-                                      exerciseId: exercise.id,
-                                      setId: added.id,
-                                    };
-                                  return w;
-                                })
-                              }
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-                      </section>
-                    );
-                  })}
+                </div>
+                <p className="workout-duration muted">
+                  Workout duration: {formatTime((now - active.started) / 1000)}
+                </p>
+                <WorkoutScreens
+                  workout={active}
+                  now={now}
+                  change={activeChange}
+                  finish={() => {
+                    if (confirm('Finish and save this workout?')) {
+                      change((d) => finishWorkout(d));
+                      setTab('Progress');
+                    }
+                  }}
+                >
+                  <h2 className="visually-hidden">Exercises</h2>
+                  {active.exercises.map((ex) => (
+                    <ExerciseCard
+                      key={ex.id}
+                      exercise={ex}
+                      workout={active}
+                      change={activeChange}
+                    />
+                  ))}
                   <button
                     className="primary full"
                     disabled={active.controller?.phase === 'set' || pendingLogs(active).length > 0}

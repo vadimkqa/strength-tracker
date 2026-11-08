@@ -69,11 +69,10 @@ test('focused keyboard viewport moves fixed controls above keyboard, then resets
       ),
     )
     .toBe('280px');
-  const nav = await page.getByRole('navigation', { name: 'Main navigation' }).boundingBox(),
-    action = await page.getByRole('button', { name: 'START SET', exact: true }).boundingBox(),
+  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeHidden();
+  const action = await page.getByRole('button', { name: 'START SET', exact: true }).boundingBox(),
     bubble = await page.getByRole('button', { name: 'Move floating timer' }).boundingBox();
-  expect(nav!.y + nav!.height).toBeLessThanOrEqual(844 - 280);
-  expect(action!.y + action!.height).toBeLessThan(nav!.y);
+  expect(action!.y + action!.height).toBeLessThanOrEqual(844 - 280);
   expect(bubble!.y + bubble!.height).toBeLessThan(action!.y);
   await page.evaluate(() => {
     Object.defineProperty(visualViewport!, 'scale', { configurable: true, value: 1.5 });

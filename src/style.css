@@ -1107,15 +1107,6 @@ p.import-warning {
   font-size: 11px;
   padding: 8px;
 }
-.performance-row {
-  grid-template-columns: 27px minmax(85px, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) 40px;
-  gap: 6px;
-}
-.performance-row .previous-set {
-  font-size: 10px;
-  line-height: 1.5;
-  color: var(--muted);
-}
 .compact-set-adjust {
   justify-content: flex-end;
 }
@@ -1126,27 +1117,6 @@ p.import-warning {
   width: 34px;
   min-height: 34px;
   font-size: 19px;
-}
-@media (max-width: 480px) {
-  .performance-row {
-    grid-template-columns: 27px minmax(0, 1fr) minmax(0, 1fr) 40px;
-  }
-  .performance-row .last-heading {
-    display: none;
-  }
-  .performance-row .previous-set {
-    grid-column: 1/-1;
-    grid-row: 1;
-    font-size: 11px;
-    padding-bottom: 2px;
-  }
-  .performance-row:not(.set-head) > span:first-child {
-    grid-column: 1;
-    grid-row: 2;
-  }
-  .performance-row .prescription-per-set {
-    grid-row: 3;
-  }
 }
 /* Layered playing cards. Only transforms/opacity animate; vertical page scrolling stays native. */
 .playing-stack-shell {
@@ -1491,9 +1461,7 @@ main.active-workout {
 .workout-screen-tabs {
   display: flex;
   gap: 8px;
-  position: sticky;
-  top: 0;
-  z-index: 4;
+  position: static;
   background: #0b0810;
   padding: 10px 0;
 }
@@ -1723,104 +1691,6 @@ main:not(.active-workout) {
     max-width: 100%;
   }
 }
-/* One shared logging header stays with the screen navigation across all exercises. */
-main.active-workout {
-  overflow: visible; /* A hidden overflow ancestor prevents viewport-based sticky positioning. */
-  --logging-columns: 44px minmax(0, 1fr) minmax(0, 1fr) 44px 44px;
-  scroll-padding-top: calc(106px + env(safe-area-inset-top));
-}
-.workout-sticky-controls {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  padding-top: env(safe-area-inset-top);
-  background: rgba(19, 13, 26, 0.98);
-  border-bottom: 1px solid #382a43;
-}
-.workout-sticky-controls .workout-screen-tabs {
-  position: static;
-  background: transparent;
-  padding: 6px 0;
-}
-.active-workout .performance-row {
-  grid-template-columns: var(--logging-columns);
-  gap: 3px 4px;
-}
-.workout-sticky-controls .set-head {
-  padding: 4px 13px 7px;
-  margin: 0;
-}
-.active-workout .exercise {
-  padding: 12px;
-  scroll-margin-top: calc(108px + env(safe-area-inset-top));
-}
-.exercise .performance-row {
-  margin: 4px 0;
-  padding: 3px 0;
-  border-bottom: 1px solid #302339;
-  scroll-margin-top: calc(110px + env(safe-area-inset-top));
-  scroll-margin-bottom: calc(195px + env(safe-area-inset-bottom));
-}
-.exercise .performance-row.active-set {
-  border-left: 0;
-  box-shadow: inset 2px 0 var(--purple);
-}
-.exercise .performance-row input,
-.exercise .performance-row button {
-  min-height: 44px;
-  height: 44px;
-  min-width: 0;
-  padding: 6px 0;
-}
-.exercise .performance-row input {
-  font-size: 16px;
-}
-.exercise .performance-row .select-set {
-  grid-column: 1;
-  grid-row: 1;
-}
-.exercise .performance-row input:nth-of-type(1) {
-  grid-column: 2;
-  grid-row: 1;
-}
-.exercise .performance-row input:nth-of-type(2) {
-  grid-column: 3;
-  grid-row: 1;
-}
-.exercise .performance-row .check {
-  grid-column: 4;
-  grid-row: 1;
-}
-.exercise .performance-row .skip-set {
-  grid-column: 5;
-  grid-row: 1;
-  width: 44px;
-  font-size: 18px;
-  color: var(--muted);
-  border-color: transparent;
-}
-.set-details {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 8px;
-  padding: 0 4px;
-}
-.exercise .performance-row .previous-set,
-.exercise .performance-row .prescription-per-set {
-  font-size: 11px;
-  line-height: 1.35;
-  padding: 0;
-  overflow-wrap: anywhere;
-}
-.active-workout .compact-set-adjust button {
-  width: 44px;
-  min-height: 44px;
-}
-.active-workout input {
-  scroll-margin-top: calc(114px + env(safe-area-inset-top));
-  scroll-margin-bottom: calc(200px + env(safe-area-inset-bottom));
-}
 .program-review fieldset {
   min-width: 0;
   border: 1px solid #382a43;
@@ -1865,4 +1735,380 @@ main.active-workout {
 .backup-summary dd {
   margin: 0;
   text-align: right;
+}
+/* Active exercise cards: all column labels belong to their card and scroll normally. */
+main.active-workout {
+  overflow: visible;
+}
+.workout-navigation {
+  position: static;
+  margin-bottom: 12px;
+}
+.exercise-card.card {
+  padding: 10px;
+  border-radius: 18px;
+  border-color: #42314f;
+  margin: 12px 0;
+  scroll-margin-top: calc(12px + env(safe-area-inset-top));
+  overflow-anchor: none;
+}
+.exercise-card.card.active-exercise {
+  border-color: var(--highlight);
+}
+.exercise-card-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.exercise-card-header button {
+  padding: 0;
+  min-height: 44px;
+}
+.exercise-toggle {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  text-align: left;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+}
+.exercise-thumbnail {
+  width: 48px;
+  height: 52px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid #42314f;
+  flex: 0 0 auto;
+}
+.exercise-card-title {
+  min-width: 0;
+  flex: 1;
+}
+.exercise-card-name {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  margin: 0 0 4px;
+}
+.exercise-card-meta {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  font-weight: 400;
+}
+.exercise-card .exercise-edit {
+  padding: 6px 8px;
+  min-width: 44px;
+  font-size: 12px;
+}
+.exercise-chevron {
+  border: 0;
+  background: transparent;
+  width: 44px;
+  flex: 0 0 44px;
+}
+.exercise-chevron svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 2;
+  transition: transform 0.16s ease;
+}
+.exercise-chevron svg.chevron-open {
+  transform: rotate(180deg);
+}
+.exercise-completion,
+.exercise-skipped {
+  flex: 0 0 23px;
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 15px;
+}
+.exercise-completion {
+  background: #19df96;
+  color: #092219;
+  font-weight: 900;
+}
+.exercise-skipped {
+  color: #c6b294;
+  border: 1px solid #776247;
+}
+.exercise-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.16s ease;
+}
+.exercise-collapse.expanded {
+  grid-template-rows: 1fr;
+}
+.exercise-content {
+  min-height: 0;
+  overflow: hidden;
+}
+.exercise-collapse:not(.expanded) .exercise-content {
+  visibility: hidden;
+}
+.exercise-card .performance-row {
+  grid-template-columns: 30px minmax(0, 1fr) minmax(0, 1fr) 44px;
+  gap: 4px 10px;
+  margin: 0;
+  padding: 7px 2px;
+  border-bottom: 1px solid #302339;
+}
+.exercise-card .set-head {
+  position: static;
+  top: auto;
+  padding: 10px 2px 8px;
+  margin-top: 10px;
+  border-top: 1px solid #42314f;
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.3px;
+  text-align: center;
+}
+.exercise-card .set-head span:first-child,
+.exercise-card .set-number {
+  text-align: center;
+}
+.exercise-card .performance-row .set-number {
+  grid-column: 1;
+  grid-row: 1;
+  color: #c8bed4;
+  font-size: 15px;
+}
+.exercise-card .performance-row.active-set {
+  padding-left: 2px;
+  border-left: 0;
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 1px var(--purple);
+}
+.exercise-card .performance-row.active-set .set-number {
+  color: var(--highlight);
+}
+.exercise-card .set-input {
+  min-width: 0;
+  width: 100%;
+  min-height: 44px;
+  height: 44px;
+  padding: 8px 4px;
+  font-size: 16px;
+  scroll-margin-top: calc(12px + env(safe-area-inset-top));
+  scroll-margin-bottom: 190px;
+}
+.exercise-card .set-input:focus {
+  outline: 0;
+  border-color: var(--highlight);
+  box-shadow: 0 0 0 1px var(--purple);
+}
+.exercise-card .set-input:nth-of-type(1) {
+  grid-column: 2;
+  grid-row: 1;
+}
+.exercise-card .set-input:nth-of-type(2) {
+  grid-column: 3;
+  grid-row: 1;
+}
+.exercise-card .set-action {
+  grid-column: 4;
+  grid-row: 1;
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text);
+}
+.exercise-card .set-action svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+.exercise-card .set-action.done {
+  color: var(--highlight);
+  background: #2a1c38;
+}
+.exercise-card .set-action.set-skipped {
+  background: #211c26;
+  color: #c6b294;
+}
+.set-details {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  padding: 0 2px;
+}
+.exercise-card .previous-set,
+.exercise-card .prescription-per-set,
+.exercise-card .set-skip-label {
+  font-size: 10px;
+  line-height: 1.45;
+  padding: 0;
+  overflow-wrap: anywhere;
+}
+.exercise-card-footer {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 8px;
+}
+.set-options {
+  min-width: 0;
+  flex: 1;
+}
+.set-options > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+}
+.exercise-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.exercise-tools button,
+.set-option-row button {
+  min-height: 44px;
+  font-size: 11px;
+  padding: 5px;
+}
+.set-option-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 5px;
+  align-items: center;
+  margin-top: 6px;
+  font-size: 11px;
+}
+.set-option-row .skip-set {
+  grid-column: auto;
+  justify-self: stretch;
+}
+.exercise-card .compact-set-adjust {
+  margin: 0;
+  flex: 0 0 auto;
+}
+.exercise-card .compact-set-adjust button {
+  width: 44px;
+  min-height: 44px;
+}
+html[data-workout-keyboard='true'] nav[aria-label='Main navigation'] {
+  visibility: hidden;
+  pointer-events: none;
+}
+html[data-workout-keyboard='true'] .workout-floating-action {
+  bottom: calc(var(--keyboard-offset, 0px) + 8px);
+  left: 12px;
+  right: 12px;
+}
+html[data-workout-keyboard='true'] .workout-floating-action button {
+  min-height: 44px;
+  height: 44px;
+}
+html[data-workout-keyboard='true'] .timer-bubble {
+  width: 56px;
+  height: 56px;
+  min-height: 56px;
+  gap: 3px;
+  padding: 5px 2px;
+}
+html[data-workout-keyboard='true'] .bubble-elapsed {
+  font-size: 14px;
+}
+html[data-workout-keyboard='true'] .bubble-phase {
+  font-size: 8px;
+}
+html[data-workout-keyboard='true'] .exercise-collapse {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .exercise-collapse,
+  .exercise-chevron svg {
+    transition: none;
+  }
+}
+
+.exercise-heading {
+  margin: 0;
+  min-width: 0;
+  flex: 1;
+}
+.exercise-toggle {
+  width: 100%;
+}
+/* Keep the approved workout title/duration compact without touching the shared brand or home. */
+.active-workout > header {
+  margin-bottom: 18px;
+}
+.active-workout > .section-title {
+  margin: 6px 0;
+  gap: 8px;
+}
+.active-workout .section-title h1 {
+  font-size: 22px;
+  letter-spacing: -0.5px;
+  line-height: 1.3;
+  margin: 0;
+}
+.active-workout-tools button {
+  min-width: 44px;
+  padding: 6px;
+  font-size: 12px;
+}
+.active-workout > .workout-duration {
+  margin-bottom: 10px;
+  text-align: center;
+}
+#workout-panel-exercises {
+  animation: exercise-panel-fade 0.12s ease;
+}
+@keyframes exercise-panel-fade {
+  from {
+    opacity: 0.8;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #workout-panel-exercises {
+    animation: none;
+  }
+}
+
+/* Card disclosures do not inherit the history screen's generous section spacing. */
+.exercise-card .prescription {
+  margin: 6px 0;
+  font-size: 11px;
+}
+.exercise-card .prescription-notes {
+  margin-top: 6px;
+  padding-top: 0;
+}
+.exercise-card .prescription-notes > summary {
+  min-height: 44px;
+  padding: 12px 0;
+  line-height: 20px;
+}
+.exercise-card .set-options {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.exercise-card .compact-set-adjust {
+  border: 0;
+  padding: 0;
 }

@@ -16,12 +16,12 @@ test('one running set spinner becomes a checkmark and floating bubble follows al
   await expect(page.getByRole('status', { name: 'Set in progress', exact: true })).toHaveCount(1);
   await expect(bubble).toContainText('Set');
   await expect(
-    page.getByRole('button', { name: 'Complete Bench Press set 1', exact: true }),
+    page.getByRole('button', { name: 'In progress Bench Press set 1', exact: true }),
   ).toHaveAttribute('aria-busy', 'true');
   await page.getByRole('button', { name: 'Select Bench Press set 2', exact: true }).click();
   await expect(page.getByRole('status', { name: 'Set in progress', exact: true })).toHaveCount(1);
   await expect(
-    page.getByRole('button', { name: 'Complete Bench Press set 2', exact: true }),
+    page.getByRole('button', { name: 'Select Bench Press set 2', exact: true }),
   ).not.toHaveAttribute('aria-busy', 'true');
   await page.clock.setSystemTime(Date.now() + 65000);
   await expect(page.getByLabel('Floating elapsed time')).toHaveText(/01:0[5-9]/);

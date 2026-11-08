@@ -1,91 +1,147 @@
 import { test, expect } from '@playwright/test';
-import { readFileSync } from 'node:fs';
-import { parseTrainingPlan, applyImportedPlan } from '../src/plan-import';
-import { emptyData } from '../src/data';
-const draft = parseTrainingPlan(readFileSync('tests/fixtures/GYM.txt', 'utf8'));
-draft.rows.forEach((r) => (r.reviewed = true));
-const data = applyImportedPlan(emptyData(), draft, true);
+import { beginCards, stored } from './exercise-fixture';
 for (const [width, height] of [
   [375, 667],
   [390, 844],
   [393, 852],
 ]) {
-  test(`compact rows and single sticky header survive long exercise scrolling at ${width}x${height}`, async ({
+  test(`per-card labels, stable keyboard columns and uncovered focused fields at ${width}x${height}`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height });
-    await page.addInitScript(
-      (d) => localStorage.setItem('strength-tracker-v1', JSON.stringify(d)),
-      data,
-    );
-    await page.goto('/strength-tracker/');
-    await page.getByRole('button', { name: 'START WORKOUT' }).click();
-    const header = page.getByLabel('Set logging columns', { exact: true });
-    await expect(header).toHaveCount(1);
-    const first = page.locator('.exercise').first();
-    const row = first.locator('.performance-row').first();
-    expect((await row.boundingBox())!.height).toBeLessThanOrEqual(88);
-    await expect(row.locator('.previous-set')).toHaveText('No previous performance');
-    await expect(row.locator('.prescription-per-set')).toContainText('6 reps · no fail');
-    for (const control of await row.locator('input,button').all()) {
-      const box = (await control.boundingBox())!;
+    await beginCards(page);
+    await expect(page.locator('.workout-navigation .set-head')).toHaveCount(0);
+    await expect(page.locator('.set-head:visible')).toHaveCount(1);
+    const first = page.locator('.exercise-card').first(),
+      header = first.locator('.set-head'),
+      row = first.locator('.performance-row:not(.set-head)').first();
+    await expect(header).toHaveText('SETREPSWEIGHT (KG)ACTION');
+    expect(await header.evaluate((e) => getComputedStyle(e).position)).toBe('static');
+    const inputs = row.locator('input');
+    const alignment = await row.evaluate((e) => {
+      const number = e.querySelector('.set-number')!.getBoundingClientRect();
+      const input = e.querySelector('input')!.getBoundingClientRect();
+      return Math.abs(number.top + number.height / 2 - (input.top + input.height / 2));
+    });
+    expect(alignment).toBeLessThan(2);
+    expect(await inputs.first().getAttribute('aria-label')).toContain('Reps');
+    for (const input of await inputs.all()) {
+      const box = (await input.boundingBox())!;
       expect(box.height).toBeGreaterThanOrEqual(44);
-      expect(Math.round(box.width * 100) / 100).toBeGreaterThanOrEqual(44);
+      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(
+        await input.evaluate((e) => parseFloat(getComputedStyle(e).fontSize)),
+      ).toBeGreaterThanOrEqual(16);
     }
-    for (const i of [0, 2, 5, 1]) {
-      const exercise = page.locator('.exercise').nth(i);
-      await exercise.evaluate((e) => e.scrollIntoView({ block: 'start' }));
-      await expect
-        .poll(async () => (await page.locator('.workout-sticky-controls').boundingBox())!.y)
-        .toBeCloseTo(0, 0);
-      const tabs = (await page.getByRole('tablist', { name: 'Workout screens' }).boundingBox())!;
-      const head = (await header.boundingBox())!;
-      expect(head.y).toBeGreaterThanOrEqual(tabs.y + tabs.height);
-      const title = (await exercise.getByRole('heading').boundingBox())!;
-      expect(title.y).toBeGreaterThanOrEqual(head.y + head.height);
-      await expect(header).toHaveCount(1);
+    const before = await inputs.evaluateAll((els) =>
+      els.map((e) => ({ x: e.getBoundingClientRect().x, width: e.getBoundingClientRect().width })),
+    );
+    const field = page.getByLabel('Weight Bench Press set 1', { exact: true });
+    await page.evaluate(() => scrollBy(0, 40));
+    await field.focus();
+    await page.evaluate(() => {
+      Object.defineProperty(visualViewport!, 'height', {
+        configurable: true,
+        value: innerHeight - 300,
+      });
+      Object.defineProperty(visualViewport!, 'offsetTop', { configurable: true, value: 20 });
+      visualViewport!.dispatchEvent(new Event('resize'));
+    });
+    await expect(page.locator('html')).toHaveAttribute('data-workout-keyboard', 'true');
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeHidden();
+    const after = await inputs.evaluateAll((els) =>
+      els.map((e) => ({ x: e.getBoundingClientRect().x, width: e.getBoundingClientRect().width })),
+    );
+    for (let i = 0; i < 2; i++) {
+      expect(after[i].x).toBeCloseTo(before[i].x, 1);
+      expect(after[i].width).toBeCloseTo(before[i].width, 1);
     }
-    const field = page.getByLabel('Weight Bench press set 3', { exact: true });
-    await field.evaluate((e) => e.scrollIntoView({ block: 'center' }));
-    await field.fill('95');
-    await expect(field).toBeFocused();
+    const action = page.getByRole('button', { name: 'START SET', exact: true }),
+      bubble = page.getByRole('button', { name: 'Move floating timer', exact: true });
+    await expect
+      .poll(async () => {
+        const r = (await field.boundingBox())!,
+          button = (await action.boundingBox())!;
+        return r.y + r.height <= button.y - 10;
+      })
+      .toBe(true);
+    const r = (await field.boundingBox())!,
+      b = (await bubble.boundingBox())!;
+    expect(r.y).toBeGreaterThanOrEqual(30);
     expect(
-      await field.evaluate((e) => parseFloat(getComputedStyle(e).fontSize)),
-    ).toBeGreaterThanOrEqual(16);
-    const bounds = (await field.boundingBox())!,
-      head = (await header.boundingBox())!;
-    expect(bounds.y).toBeGreaterThanOrEqual(head.y + head.height);
+      b.x + b.width <= r.x ||
+        b.x >= r.x + r.width ||
+        b.y + b.height <= r.y ||
+        b.y >= r.y + r.height,
+    ).toBe(true);
+    await field.fill('67.5');
+    const scroll = await page.evaluate(() => scrollY);
+    await page.getByLabel('Reps Bench Press set 1', { exact: true }).fill('9');
+    expect(await page.evaluate(() => Math.abs(scrollY))).toBeGreaterThan(0);
+    expect(Math.abs((await page.evaluate(() => scrollY)) - scroll)).toBeLessThan(60);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
-    await page.getByLabel('Reps Bench press set 3', { exact: true }).fill('5');
-    await page.getByRole('button', { name: 'Select Bench press set 3', exact: true }).click();
-    await page.getByRole('button', { name: 'START SET', exact: true }).click();
-    await expect(page.getByRole('status', { name: 'Set in progress' })).toHaveCount(1);
-    const bubble = page.getByRole('button', { name: 'Move floating timer', exact: true });
-    const before = (await bubble.boundingBox())!;
-    await page.mouse.move(before.x + 38, before.y + 38);
+    await page.screenshot({ path: `test-results/exercise-keyboard-${width}.png` });
+    await page
+      .getByLabel('Reps Bench Press set 1', { exact: true })
+      .dispatchEvent('pointerdown', { clientX: 250, clientY: 200, pointerType: 'touch' });
+    await page
+      .getByLabel('Reps Bench Press set 1', { exact: true })
+      .dispatchEvent('pointerup', { clientX: 50, clientY: 200, pointerType: 'touch' });
+    await expect(page.getByRole('tab', { name: 'EXERCISES', exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    const old = (await bubble.boundingBox())!;
+    await page.mouse.move(old.x + old.width / 2, old.y + old.height / 2);
     await page.mouse.down();
-    await page.mouse.move(60, 160, { steps: 12 });
+    await page.mouse.move(width - 70, 90, { steps: 10 });
     await page.mouse.up();
-    expect((await bubble.boundingBox())!.x).toBeLessThan(before.x);
-    await page.screenshot({ path: `test-results/compact-logging-${width}.png` });
-    await first.dispatchEvent('pointerdown', { clientX: 300, clientY: 250, pointerType: 'touch' });
-    await first.dispatchEvent('pointerup', { clientX: 80, clientY: 250, pointerType: 'touch' });
+    await expect(page.getByRole('tab', { name: 'EXERCISES', exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await field.blur();
+    await page.evaluate(() => {
+      Object.defineProperty(visualViewport!, 'height', { configurable: true, value: innerHeight });
+      Object.defineProperty(visualViewport!, 'offsetTop', { configurable: true, value: 0 });
+      visualViewport!.dispatchEvent(new Event('resize'));
+    });
+    await expect(page.locator('html')).not.toHaveAttribute('data-workout-keyboard', 'true');
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
+    await page.getByRole('button', { name: 'Expand Chest Dip', exact: true }).click();
+    await expect(page.locator('.set-head:visible')).toHaveCount(2);
+    await expect
+      .poll(() =>
+        page
+          .locator('.exercise-card')
+          .nth(1)
+          .evaluate(
+            (e) =>
+              e.getAnimations({ subtree: true }).filter((a) => a.playState === 'running').length,
+          ),
+      )
+      .toBe(0);
+    await header.evaluate((e) => e.scrollIntoView({ block: 'start' }));
+    const top = (await header.boundingBox())!.y;
+    await page.evaluate(() => scrollBy(0, 100));
+    expect((await header.boundingBox())!.y).toBeLessThan(top - 30);
+    await first
+      .locator('.exercise-toggle')
+      .dispatchEvent('pointerdown', { clientX: 300, clientY: 200, pointerType: 'touch' });
+    await first
+      .locator('.exercise-toggle')
+      .dispatchEvent('pointerup', { clientX: 70, clientY: 200, pointerType: 'touch' });
     await expect(page.getByRole('tab', { name: 'TIMER', exact: true })).toHaveAttribute(
       'aria-selected',
       'true',
     );
-    await expect(header).toHaveCount(0);
     await expect(bubble).toHaveCount(0);
     await page.getByRole('tab', { name: 'EXERCISES', exact: true }).click();
-    await expect(header).toHaveCount(1);
-    await expect(bubble).toBeVisible();
-    await expect(page.getByRole('status', { name: 'Set in progress' })).toHaveCount(1);
-    const nav = (await page.getByRole('navigation', { name: 'Main navigation' }).boundingBox())!;
-    const action = (await page
-      .getByRole('button', { name: 'STOP SET', exact: true })
-      .boundingBox())!;
-    expect(action.y + action.height).toBeLessThan(nav.y);
+    await expect(field).toHaveValue('67.5');
+    await stored(page);
+    await page.evaluate(() => scrollTo(0, 0));
+    await page.screenshot({ path: `test-results/exercise-expanded-${width}.png`, fullPage: true });
   });
 }
