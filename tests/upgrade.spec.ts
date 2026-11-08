@@ -8,7 +8,10 @@ test('v1 cached installation upgrades to React without losing localStorage histo
   let modern = false;
   const server = createServer(async (req, res) => {
     try {
-      const pathname = new URL(req.url!, 'http://localhost').pathname;
+      const requested = new URL(req.url!, 'http://localhost').pathname;
+      const pathname = modern
+        ? requested.replace(/^\/strength-tracker(?=\/|$)/, '') || '/'
+        : requested;
       const root = modern ? 'dist' : 'legacy';
       const file = join(process.cwd(), root, pathname === '/' ? 'index.html' : pathname);
       const content = await readFile(file);
