@@ -179,7 +179,7 @@ test('preview edits and ordering persist into templates and import works offline
   ]);
   expect(saved.plan['Sunday · Legs · Easy'][0][1]).toBe(2);
 });
-test('layered stack shows both neighbors, supports mouse dragging, arrows and wraparound', async ({
+test('layered stack shows both neighbors, supports mouse dragging, keyboard and wraparound', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 900, height: 1000 });
@@ -210,11 +210,13 @@ test('layered stack shows both neighbors, supports mouse dragging, arrows and wr
     /selected/,
   );
   await expect.poll(() => center('DB Press Day')).toBeLessThan(3);
-  await page.getByRole('button', { name: 'Previous workout', exact: true }).click();
+  await page.getByRole('region', { name: 'Workout selection', exact: true }).focus();
+  await page.keyboard.press('ArrowLeft');
   await expect.poll(() => center('Bench Day')).toBeLessThan(3);
-  await page.getByRole('button', { name: 'Previous workout', exact: true }).click();
+  await page.getByRole('region', { name: 'Workout selection', exact: true }).focus();
+  await page.keyboard.press('ArrowLeft');
   await expect.poll(() => center('Leg Day')).toBeLessThan(3);
-  await page.getByRole('button', { name: 'Next workout', exact: true }).click();
+  await page.keyboard.press('ArrowRight');
   await expect.poll(() => center('Bench Day')).toBeLessThan(3);
   await page.screenshot({ path: 'test-results/carousel-desktop.png', fullPage: true });
 });

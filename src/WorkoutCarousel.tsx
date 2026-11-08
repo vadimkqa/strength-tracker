@@ -161,17 +161,9 @@ export function WorkoutCarousel({
           );
         })}
       </div>
-      <div className="carousel-arrows stack-navigation">
-        <button aria-label="Previous workout" onClick={() => choose(selected - 1)}>
-          ←
-        </button>
-        <span aria-live="polite">
-          {workouts[selected].name} · {selected + 1} / 4
-        </span>
-        <button aria-label="Next workout" onClick={() => choose(selected + 1)}>
-          →
-        </button>
-      </div>
+      <span className="visually-hidden" aria-live="polite">
+        {workouts[selected].name} · {selected + 1} / 4
+      </span>
     </div>
   );
 }

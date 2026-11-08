@@ -108,3 +108,9 @@ Cards show the existing imported session's day, rotation week, intensity, photo 
 Production assets and the PWA are scoped to `/strength-tracker/`. The GitHub Actions workflow in `.github/workflows/deploy-pages.yml` checks pull requests and publishes `dist/` after a push to `main`.
 
 See [GitHub Pages deployment and iPhone setup](docs/GITHUB_PAGES.md) for enabling Pages, deploying, installing through Safari, and safely transferring your existing JSON backup. A new host/device cannot automatically access your Mac's browser storage; no storage keys or training logic are changed by deployment.
+
+## Compact iPhone Train home
+
+On phones, Train hides the motivational intro, keeps a compact logo/rotation header and reduces the layered card stack by approximately 20%. Visible carousel arrows/counter are removed; swipe, side-card taps, keyboard selection and pagination remain available. Dots sit directly beneath the cards, followed by intensity and Start Workout.
+
+Home spacing uses dynamic viewport units and safe-area padding. The page reserves space for the fixed bottom navigation and remains vertically scrollable on short viewports. `tests/mobile-home-layout.spec.ts` checks initial Start-button bounds and hit testing at 375×667, 390×844 and 393×852, plus scroll recovery at 320×480 with extra bottom padding. Playwright starts the production preview automatically if it is not already running; build before running browser tests. Phone-sized Chromium tests are not a physical Safari/device test.
