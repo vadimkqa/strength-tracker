@@ -93,7 +93,7 @@ test('legacy history migrates, workout persists, timer and logging, history and 
   await page.getByRole('spinbutton', { name: 'Weight Bench Press set 1', exact: true }).fill('60');
   await page.getByRole('spinbutton', { name: 'Reps Bench Press set 1', exact: true }).fill('8');
   await page.getByRole('button', { name: 'Complete Bench Press set 1', exact: true }).click();
-  await expect(page.getByText('Resting', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'START SET', exact: true })).toBeVisible();
   await expect(page.locator('.save-status')).toHaveText('Saved on this device');
   await page.reload();
   await expect(
@@ -102,8 +102,9 @@ test('legacy history migrates, workout persists, timer and logging, history and 
   await expect(
     page.getByRole('button', { name: 'Undo Bench Press set 1', exact: true }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Skip', exact: true }).click();
-  await expect(page.getByLabel('Rest countdown')).toHaveText('00:00:00');
+  await page.getByRole('tab', { name: 'TIMER', exact: true }).click();
+  await expect(page.getByLabel('Current phase')).toHaveText('Warm-up');
+  await page.getByRole('tab', { name: 'EXERCISES', exact: true }).click();
   await page.getByRole('button', { name: 'Add set to Bench Press', exact: true }).click();
   await expect(
     page.getByRole('spinbutton', { name: 'Weight Bench Press set 5', exact: true }),
@@ -177,10 +178,10 @@ test('PWA assets and all photos are cached, offline reload and workout logging w
   await page.getByRole('button', { name: 'START WORKOUT' }).click();
   await page.getByRole('spinbutton', { name: 'Reps Bench Press set 1', exact: true }).fill('10');
   await page.getByRole('button', { name: 'Complete Bench Press set 1', exact: true }).click();
-  await expect(page.getByText('Resting', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'START SET', exact: true })).toBeVisible();
 });
 
-test('exercise editing/addition, rest presets, undo, discard and explicit history deletion', async ({
+test('exercise editing/addition, screen navigation, undo, discard and explicit history deletion', async ({
   page,
 }) => {
   await page.goto('/');
@@ -199,8 +200,9 @@ test('exercise editing/addition, rest presets, undo, discard and explicit histor
   await expect(
     page.getByRole('button', { name: 'Complete Custom Press set 1', exact: true }),
   ).toBeVisible();
-  await page.getByRole('button', { name: '1 min', exact: true }).click();
-  await expect(page.getByText('Resting', { exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'TIMER', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'START SET', exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'EXERCISES', exact: true }).click();
   await page.getByRole('button', { name: 'Discard workout', exact: true }).click();
   await page.getByRole('button', { name: 'START WORKOUT' }).click();
   await page.getByRole('button', { name: 'Finish & save workout', exact: true }).click();

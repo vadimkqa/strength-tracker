@@ -1472,3 +1472,127 @@ main.home-screen {
     height: clamp(90px, 19dvh, 116px) !important;
   }
 }
+main.active-workout {
+  padding-bottom: calc(190px + env(safe-area-inset-bottom));
+}
+.workout-controller {
+  touch-action: pan-y;
+}
+.workout-screen-tabs {
+  display: flex;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: #0b0810;
+  padding: 10px 0;
+}
+.workout-screen-tabs button {
+  flex: 1;
+  font-size: 12px;
+  letter-spacing: 1px;
+  background: var(--card);
+}
+.workout-screen-tabs button[aria-selected='true'] {
+  color: var(--highlight);
+  border-color: var(--purple);
+}
+.workout-floating-action {
+  position: fixed;
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  left: 20px;
+  right: 20px;
+  z-index: 6;
+  max-width: 512px;
+  margin: auto;
+}
+.workout-floating-action button {
+  width: 100%;
+  min-height: 54px;
+  box-shadow: 0 5px 22px #0009;
+  letter-spacing: 1px;
+}
+.timer-screen {
+  min-height: 55dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+  padding: 25px 0;
+}
+.stopwatch {
+  font-size: clamp(60px, 19vw, 94px);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -4px;
+  line-height: 1.15;
+  color: var(--highlight);
+}
+.total-stopwatch {
+  font-size: 25px;
+  font-variant-numeric: tabular-nums;
+}
+.timer-screen .eyebrow {
+  margin: 5px 0;
+}
+.timer-screen h2 {
+  margin-bottom: 0;
+}
+.active-exercise {
+  border-color: #674486;
+}
+.active-set {
+  border-left: 2px solid var(--purple);
+  padding-left: 6px;
+  background: #241a3040;
+  border-radius: 8px;
+}
+.needs-logging {
+  outline: 1px solid #b88b66;
+  border-radius: 8px;
+}
+.select-set {
+  font-size: 12px;
+  padding: 0;
+  min-height: 34px;
+  min-width: 26px;
+  background: transparent;
+  border: 0;
+  color: var(--highlight);
+}
+.skip-set {
+  grid-column: 1/-1;
+  font-size: 10px;
+  min-height: 28px;
+  padding: 3px 8px;
+  justify-self: end;
+  background: transparent;
+}
+.workout-duration {
+  font-variant-numeric: tabular-nums;
+}
+.exercise .small {
+  font-size: 10px;
+  min-height: 30px;
+  padding: 5px 8px;
+  margin-right: 5px;
+}
+.workout-panel {
+  animation: workout-panel-enter 0.16s ease-out;
+}
+@keyframes workout-panel-enter {
+  from {
+    opacity: 0.6;
+    transform: translateX(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workout-panel {
+    animation: none;
+  }
+}
