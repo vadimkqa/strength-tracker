@@ -1,3 +1,4 @@
+import type { TrainingProgram } from './importing/model';
 // Stable IDs keep existing templates and history compatible with v1.
 export const workouts = [
   {
@@ -66,11 +67,65 @@ function weekdayIndex(day: string) {
   const index = weekdays.findIndex((d) => normalized === d || normalized === d.slice(0, 3));
   return index < 0 ? 7 : index;
 }
-export function carouselWorkouts(rotation?: Rotation, week = 1) {
-  return [...workouts].sort((a, b) => {
-    const day = (workout: (typeof workouts)[number]) =>
-      rotation?.sessions.find((s) => s.week === week && s.workout === workout.key)?.day ||
-      workout.day;
-    return weekdayIndex(day(a)) - weekdayIndex(day(b));
-  });
+export interface WorkoutCard {
+  key: string;
+  name: string;
+  day: string;
+  muscles: string;
+  photo: string;
+  caption: string;
+  templateKey?: string;
+  intensity?: string | null;
+}
+export function carouselWorkouts(
+  rotation?: Rotation,
+  week = 1,
+  program?: TrainingProgram,
+  preferredIntensity?: string,
+): WorkoutCard[] {
+  if (program && !rotation) {
+    let templates = program.workouts.filter((w) => w.week === week);
+    if (program.source.format === 'legacy-txt') {
+      const slots = [...new Set(templates.map((w) => w.slotId))];
+      templates = slots.map(
+        (slot) =>
+          templates.find(
+            (w) =>
+              w.slotId === slot &&
+              w.intensity === (preferredIntensity === 'easy' ? 'easy' : 'hard'),
+          ) || templates.find((w) => w.slotId === slot)!,
+      );
+    }
+    return templates
+      .sort(
+        (a, b) =>
+          (a.day && b.day ? weekdayIndex(a.day) - weekdayIndex(b.day) : 0) || a.order - b.order,
+      )
+      .map((w, i) => {
+        const photo = workouts.find((c) => c.key === w.slotId) || workouts[i % workouts.length];
+        return {
+          key: w.slotId,
+          name: w.name,
+          day: w.day || 'Unscheduled',
+          muscles: workouts.find((c) => c.key === w.slotId)?.muscles || 'YOUR TRAINING PROGRAM',
+          photo: photo.photo,
+          caption: photo.caption,
+          templateKey: w.id,
+          intensity: w.intensity,
+        };
+      });
+  }
+  if (rotation)
+    return rotation.sessions
+      .filter((s) => s.week === week)
+      .map((s) => ({ session: s, card: workouts.find((w) => w.key === s.workout) }))
+      .filter((item) => !!item.card)
+      .sort((a, b) => weekdayIndex(a.session.day) - weekdayIndex(b.session.day))
+      .map(({ session: s, card }) => ({
+        ...card!,
+        day: s.day || 'Unscheduled',
+        templateKey: s.key,
+        intensity: s.intensity,
+      }));
+  return [...workouts].sort((a, b) => weekdayIndex(a.day) - weekdayIndex(b.day));
 }

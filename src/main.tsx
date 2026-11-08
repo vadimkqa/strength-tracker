@@ -1,3 +1,5 @@
+import { resizeTemplateSets } from './importing/saving';
+import type { TrainingProgram } from './importing/model';
 import { carouselIndex, chooseWorkout, chooseWeek, workoutDifficulty } from './carousel-selection';
 import { useKeyboardViewport } from './useKeyboardViewport';
 import { WorkoutScreens } from './WorkoutScreens';
@@ -206,7 +208,7 @@ function App() {
       setRestoring(false);
     }
   }
-  async function applyPlan(draft: PlanDraft) {
+  async function applyPlan(draft: PlanDraft | TrainingProgram) {
     if (!current.current || importing.current) throw Error('Wait for the current save to finish.');
     importing.current = true;
     setRestoring(true);
@@ -216,6 +218,7 @@ function App() {
       current.current = next;
       setData(next);
       if (next.rotation?.sessions[0]) setPlanKey(next.rotation.sessions[0].key);
+      else if (next.trainingProgram?.workouts[0]) setPlanKey(next.trainingProgram.workouts[0].id);
       setError('');
     } finally {
       importing.current = false;
@@ -259,11 +262,21 @@ function App() {
           )
             records.set(e.name, { weight: Number(s.weight), reps: Number(s.reps) });
         }
-  const cards = carouselWorkouts(data.rotation, data.rotationWeek);
+  const cards = carouselWorkouts(data.rotation, data.rotationWeek, data.trainingProgram, data.week);
   const index = carouselIndex(data);
-  const rotationSession = data.rotation?.sessions.find(
-    (s) => s.week === (data.rotationWeek || 1) && s.workout === cards[index].key,
+  const programTemplate = data.trainingProgram?.workouts.find(
+    (w) => w.id === cards[index]?.templateKey,
   );
+  const rotationSession = programTemplate
+    ? {
+        key: programTemplate.id,
+        day: programTemplate.day || 'Unscheduled',
+        intensity: programTemplate.intensity,
+        week: programTemplate.week,
+      }
+    : data.rotation?.sessions.find(
+        (s) => s.week === (data.rotationWeek || 1) && s.workout === cards[index].key,
+      );
   const selectedIntensity = workoutDifficulty(data, index);
   return (
     <>
@@ -307,9 +320,11 @@ function App() {
                 </div>
                 <div className="section-title">
                   <h2>Your workout</h2>
-                  <span>{String(index + 1).padStart(2, '0')} / 04</span>
+                  <span>
+                    {String(index + 1).padStart(2, '0')} / {String(cards.length).padStart(2, '0')}
+                  </span>
                 </div>
-                {data.rotation && (
+                {(data.rotation || data.trainingProgram?.rotation) && (
                   <div className="rotation-selection">
                     <label htmlFor="rotation-week">TRAINING ROTATION</label>
                     <select
@@ -317,15 +332,17 @@ function App() {
                       value={data.rotationWeek || 1}
                       onChange={(e) => change((d) => chooseWeek(d, Number(e.target.value)))}
                     >
-                      {data.rotation.weeks.map((w) => (
-                        <option key={w} value={w}>
-                          Week {w}
-                        </option>
-                      ))}
+                      {(data.rotation?.weeks || data.trainingProgram?.rotation?.weeks || []).map(
+                        (w) => (
+                          <option key={w} value={w}>
+                            Week {w}
+                          </option>
+                        ),
+                      )}
                     </select>
                     <p className="muted">
                       {rotationSession
-                        ? `${rotationSession.day} · ${rotationSession.intensity === 'hard' ? 'Hard' : 'Easy'} session`
+                        ? `${rotationSession.day} · ${rotationSession.intensity ? (/^(hard|heavy)$/i.test(rotationSession.intensity) ? 'Hard' : /^easy$/i.test(rotationSession.intensity) ? 'Easy' : rotationSession.intensity) : 'Intensity unspecified'} session`
                         : 'No session scheduled for this workout in this week.'}
                     </p>
                   </div>
@@ -336,13 +353,15 @@ function App() {
                   onSelect={(i, wrap = 0) => change((d) => chooseWorkout(d, i, wrap))}
                   plan={data.plan}
                   week={selectedIntensity}
+                  program={data.trainingProgram}
+                  preferredIntensity={data.week}
                   rotation={data.rotation}
                   rotationWeek={data.rotationWeek || 1}
                 />
                 <div className="pagination" aria-label="Choose workout">
                   {cards.map((c, i) => (
                     <button
-                      key={c.name}
+                      key={c.key}
                       aria-label={`Select ${c.name}`}
                       aria-current={index === i ? 'true' : undefined}
                       className={index === i ? 'selected' : ''}
@@ -360,9 +379,14 @@ function App() {
                         className={selectedIntensity === w ? 'chosen' : ''}
                         onClick={() =>
                           change((d) =>
-                            rotationSession
-                              ? { ...d, difficultyOverride: { key: rotationSession.key, value: w } }
-                              : { ...d, week: w },
+                            d.trainingProgram?.source.format === 'legacy-txt'
+                              ? { ...d, week: w, difficultyOverride: undefined }
+                              : rotationSession
+                                ? {
+                                    ...d,
+                                    difficultyOverride: { key: rotationSession.key, value: w },
+                                  }
+                                : { ...d, week: w },
                           )
                         }
                       >
@@ -374,7 +398,8 @@ function App() {
                 <button
                   className="primary start"
                   disabled={
-                    !!data.rotation && (!rotationSession || !data.plan[rotationSession.key])
+                    (!!data.rotation || !!programTemplate) &&
+                    (!rotationSession || !data.plan[rotationSession.key])
                   }
                   onClick={() =>
                     change((d) => ({
@@ -386,6 +411,12 @@ function App() {
                             d.plan,
                             Date.now(),
                             d.history,
+                            programTemplate && !programTemplate.legacyKey
+                              ? {
+                                  displayName: programTemplate.name,
+                                  cycleWeek: programTemplate.week,
+                                }
+                              : undefined,
                           )
                         : createWorkout(cards[index].key, d.week, d.plan, Date.now(), d.history),
                     }))
@@ -400,9 +431,20 @@ function App() {
                 <div className="section-title">
                   <div>
                     <p className="eyebrow">
-                      {active.week === 'easy' ? 'EASY' : 'HARD'} · IN SESSION
+                      {active.week
+                        ? active.week === 'heavy'
+                          ? 'HARD'
+                          : active.week.toUpperCase()
+                        : 'INTENSITY UNSPECIFIED'}{' '}
+                      · IN SESSION
                     </p>
-                    <h1>{label(active.name)}</h1>
+                    <h1>
+                      {active.displayName ||
+                        data.trainingProgram?.workouts.find(
+                          (w) => w.id === active.name && !w.legacyKey,
+                        )?.name ||
+                        label(active.name)}
+                    </h1>
                   </div>
                   <span className="live-dot">●</span>
                 </div>
@@ -532,6 +574,7 @@ function App() {
                             {ex.optional ? ' · OPTIONAL' : ''}
                           </p>
                         )}
+                        {ex.groupLabel && <p className="eyebrow">{ex.groupLabel}</p>}
                         {ex.alternatives?.length ? (
                           <p className="muted">Alternatives: {ex.alternatives.join(' OR ')}</p>
                         ) : null}
@@ -671,6 +714,14 @@ function App() {
                                 <small className="prescription-per-set">
                                   Set {s.prescription.number ?? '?'}: {repsLabel(s.prescription)}{' '}
                                   reps · {s.prescription.effort}
+                                  {s.prescription.targetWeight &&
+                                    ` · ${s.prescription.targetWeight.value} ${s.prescription.targetWeight.unit}`}
+                                  {s.prescription.targetRpe != null &&
+                                    ` · RPE ${s.prescription.targetRpe}`}
+                                  {s.prescription.targetRir != null &&
+                                    ` · RIR ${s.prescription.targetRir}`}
+                                  {s.prescription.restSeconds != null &&
+                                    ` · Rest ${s.prescription.restSeconds}s`}
                                 </small>
                               )}
                             </div>
@@ -787,9 +838,19 @@ function App() {
                       month: 'short',
                       year: 'numeric',
                     })}{' '}
-                    · {w.week === 'easy' ? 'EASY' : 'HARD'}
+                    ·{' '}
+                    {w.week
+                      ? w.week === 'heavy'
+                        ? 'HARD'
+                        : w.week.toUpperCase()
+                      : 'INTENSITY UNSPECIFIED'}
                   </p>
-                  <h3>{label(w.name)}</h3>
+                  <h3>
+                    {w.displayName ||
+                      data.trainingProgram?.workouts.find((t) => t.id === w.name && !t.legacyKey)
+                        ?.name ||
+                      label(w.name)}
+                  </h3>
                   <p className="muted">
                     {w.exercises.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0)} sets
                     ·{' '}
@@ -879,7 +940,8 @@ function App() {
               >
                 {Object.keys(data.plan).map((k) => (
                   <option key={k} value={k}>
-                    {label(k)}
+                    {data.trainingProgram?.workouts.find((w) => w.id === k && !w.legacyKey)?.name ||
+                      label(k)}
                   </option>
                 ))}
               </select>
@@ -901,8 +963,12 @@ function App() {
                           change((d) => {
                             const ex =
                               d.plan[d.plan[planKey] ? planKey : Object.keys(d.plan)[0]][i];
-                            ex[1] = Math.max(1, (ex[1] ?? 0) - 1);
-                            return d;
+                            return resizeTemplateSets(
+                              d,
+                              d.plan[planKey] ? planKey : Object.keys(d.plan)[0],
+                              i,
+                              Math.max(1, (ex[1] ?? 0) - 1),
+                            );
                           })
                         }
                       >
@@ -910,13 +976,17 @@ function App() {
                       </button>
                       <button
                         aria-label={`More sets ${name}`}
-                        disabled={count !== null && count >= 12}
+                        disabled={count !== null && count >= (data.trainingProgram ? 100 : 12)}
                         onClick={() =>
                           change((d) => {
                             const ex =
                               d.plan[d.plan[planKey] ? planKey : Object.keys(d.plan)[0]][i];
-                            ex[1] = (ex[1] ?? 0) + 1;
-                            return d;
+                            return resizeTemplateSets(
+                              d,
+                              d.plan[planKey] ? planKey : Object.keys(d.plan)[0],
+                              i,
+                              (ex[1] ?? 0) + 1,
+                            );
                           })
                         }
                       >

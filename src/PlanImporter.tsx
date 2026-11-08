@@ -1,3 +1,7 @@
+import { extractDocument, textDocument, type ExtractedDocument } from './importing/extraction';
+import { parseProgram } from './importing/parser';
+import { stableId, type TrainingProgram } from './importing/model';
+import { ProgramReview } from './importing/ProgramReview';
 import { useState } from 'react';
 import {
   parseTrainingPlan,
@@ -11,9 +15,11 @@ import {
 import { setWarnings, repsLabel, type SetPrescription } from './prescriptions';
 import { workouts, templateLabel, type WorkoutId, type Intensity } from './workouts';
 interface Props {
-  onApply: (draft: PlanDraft) => Promise<void>;
+  onApply: (draft: PlanDraft | TrainingProgram) => Promise<void>;
 }
 export function PlanImporter({ onApply }: Props) {
+  const [extractedDocument, setDocument] = useState<ExtractedDocument | null>(null);
+  const [program, setProgram] = useState<TrainingProgram | null>(null);
   const [source, setSource] = useState(''),
     [aliases, setAliases] = useState(''),
     [parsedAliases, setParsedAliases] = useState('');
@@ -62,39 +68,54 @@ export function PlanImporter({ onApply }: Props) {
   async function readFile(file: File) {
     setError('');
     try {
-      if (!/\.txt$/i.test(file.name)) throw Error('Choose a TXT file.');
-      if (file.size > 1_048_576) throw Error('The TXT file must be 1 MB or smaller.');
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const encoding =
-        bytes[0] === 255 && bytes[1] === 254
-          ? 'utf-16le'
-          : bytes[0] === 254 && bytes[1] === 255
-            ? 'utf-16be'
-            : 'utf-8';
-      const text = new TextDecoder(encoding, { fatal: true }).decode(bytes);
-      if (text.includes('\0')) throw Error('This does not look like a text file.');
+      setBusy(true);
+      const extracted = await extractDocument(file);
+      const text = extracted.text;
+      setDocument(extracted);
       setSource(text);
       setFilename(file.name);
       setConfirmed(false);
       setApplied(false);
     } catch (e) {
       setError('File not loaded: ' + (e as Error).message);
+    } finally {
+      setBusy(false);
     }
   }
   function parse() {
     try {
-      if (source.length > 1_048_576 || source.split(/\r\n?|\n/).length > 2000)
-        throw Error('Import at most 1 MB and 2,000 lines.');
+      if (source.length > 2_000_000 || source.split(/\r\n?|\n/).length > 10000)
+        throw Error('Import at most 2 MB and 10,000 lines.');
       if (!source.trim()) throw Error('Choose a TXT file or paste your plan first.');
       const custom = parseAliases(aliases);
       if (
-        draft &&
+        (draft || program) &&
         !confirm(
           'Reparse the source? This discards preview edits only. Your saved templates will not change.',
         )
       )
         return;
       const result = parseTrainingPlan(source, custom);
+      // The established parser remains an explicit compatibility adapter for its known formats.
+      // Unknown workout headings go through the independent program parser, never forced onto four IDs.
+      const legacy =
+        result.rows.length > 0 &&
+        (aliases.trim() || /\b(?:Bench Day|DB Press|Hammer Press|Leg Day)\b/i.test(source)) &&
+        (result.rows.every((r) => r.workout) ||
+          result.rows.filter((r) => r.workout).length / result.rows.length > 0.8);
+      if (!legacy || (extractedDocument?.format && !['txt'].includes(extractedDocument.format))) {
+        const doc =
+          extractedDocument?.text === source
+            ? extractedDocument
+            : textDocument(source, filename || 'Pasted plan');
+        setProgram(parseProgram(doc));
+        setDraft(null);
+        setError('');
+        setConfirmed(false);
+        setApplied(false);
+        return;
+      }
+      setProgram(null);
       setDraft(result);
       setWeek(result.rows[0]?.week || 1);
       setWorkout(result.rows[0]?.workout || '');
@@ -121,13 +142,14 @@ export function PlanImporter({ onApply }: Props) {
     <section className="card plan-importer" aria-labelledby="import-title">
       <h2 id="import-title">Import Training Plan</h2>
       <p className="muted">
-        TXT parsing stays on this device. Uploading and reviewing never change saved templates.
+        Document extraction and parsing stay on this device. Uploading and reviewing never change
+        saved templates.
       </p>
-      <label htmlFor="plan-file">UPLOAD TXT FILE</label>
+      <label htmlFor="plan-file">UPLOAD PLAN FILE</label>
       <input
         id="plan-file"
         type="file"
-        accept=".txt,text/plain"
+        accept=".txt,.pdf,.docx,.csv,.xlsx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
         disabled={busy}
         onChange={(e) => {
           const f = e.target.files?.[0];
@@ -151,7 +173,8 @@ export function PlanImporter({ onApply }: Props) {
           }}
         />
         <p className="muted">
-          Day headings such as “Tuesday; Bench (Heavy):” and “Week 2” define sessions. Numbered
+          Use weekday or workout headings (Full Body, Upper/Lower, Push/Pull/Legs, Workout A/B, Day
+          1…), optional Week headings, or tables with Workout and Exercise columns. Numbered
           prescriptions in parentheses attach to the exercise above. Rest times remain unset if
           absent.
         </p>
@@ -170,7 +193,7 @@ export function PlanImporter({ onApply }: Props) {
         />
       </details>
       <button className="full" disabled={busy} onClick={parse}>
-        {draft ? 'Reparse TXT' : 'Parse TXT'}
+        {draft || program ? 'Reparse TXT' : 'Parse TXT'}
       </button>
       {error && (
         <p role="alert" className="import-warning">
@@ -182,6 +205,19 @@ export function PlanImporter({ onApply }: Props) {
           Plan applied. History, PRs and your active workout were kept. New templates apply to
           future sessions.
         </p>
+      )}
+      {program && (
+        <ProgramReview
+          key={program.id + stableId(program.source.text)}
+          program={program}
+          change={setProgram}
+          onApply={onApply}
+          stale={program.source.text !== source}
+          cancel={() => {
+            setProgram(null);
+            setError('');
+          }}
+        />
       )}
       {draft && (
         <div aria-label="Editable plan preview">

@@ -1,5 +1,8 @@
 import type { SetPrescription } from './prescriptions';
 export interface Prescription {
+  exerciseId?: string;
+  groupId?: string;
+  groupLabel?: string;
   reps: string;
   notes: string;
   category: string;

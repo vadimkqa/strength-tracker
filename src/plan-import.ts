@@ -1,3 +1,4 @@
+import { legacyProgram } from './importing/compatibility';
 import { parseSetBlock, setWarnings, type SetPrescription } from './prescriptions';
 /** Pure rule-based TXT parsing. No storage, UI, network or exercise-name inference. */
 import {
@@ -475,6 +476,10 @@ export function applyImportedPlan(current: Data, draft: PlanDraft, confirmed: bo
   return {
     ...current,
     plan: { ...current.plan, ...plan },
+    trainingProgram: legacyProgram(draft, plan, sessions),
+    rotation: undefined,
+    rotationWeek: sessions[0]?.week || 1,
+    difficultyOverride: undefined,
     ...(draft.rotation
       ? {
           rotation: { weeks: [...new Set(sessions.map((s) => s.week))], sessions },

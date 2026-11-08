@@ -16,7 +16,7 @@ export function setNumber(set: SetEntry, index: number): number | null {
   return set.prescription ? set.prescription.number : index + 1;
 }
 function week(workout: Workout) {
-  return workout.name.match(/^Week (\d+) ·/)?.[1];
+  return workout.cycleWeek ? String(workout.cycleWeek) : workout.name.match(/^Week (\d+) ·/)?.[1];
 }
 export function previousPerformance(
   workout: Workout,
@@ -68,7 +68,7 @@ export function suggestSet(ex: Exercise, set: SetEntry, index: number): SetEntry
 export function preparePerformance(workout: Workout, history: Workout[]): Workout {
   const result = structuredClone(workout);
   result.exercises.forEach((ex) => {
-    ex.exerciseKey = exerciseIdentity(ex.name);
+    ex.exerciseKey ||= exerciseIdentity(ex.name);
     ex.previousPerformance = previousPerformance(result, ex, history);
     ex.sets = ex.sets.map((s, i) => suggestSet(ex, s, i));
   });

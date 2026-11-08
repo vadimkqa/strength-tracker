@@ -1,4 +1,9 @@
 export interface SetPrescription {
+  targetWeight?: { value: number; unit: string } | null;
+  targetRpe?: number | null;
+  targetRir?: number | null;
+  restSeconds?: number | null;
+  repsText?: string | null;
   number: number | null;
   minReps: number | null;
   maxReps: number | null;

@@ -1,13 +1,18 @@
+import { applyProgram } from './importing/saving';
+import type { TrainingProgram } from './importing/model';
 import { openStore, type Data } from './data';
 import { applyImportedPlan, type PlanDraft } from './plan-import';
 
 export async function saveImportedPlan(
   current: Data,
-  draft: PlanDraft,
+  draft: PlanDraft | TrainingProgram,
   confirmed: boolean,
   dbName?: string,
 ) {
-  const next = applyImportedPlan(current, draft, confirmed);
+  const next =
+    'schemaVersion' in draft
+      ? applyProgram(current, draft, confirmed)
+      : applyImportedPlan(current, draft, confirmed);
   const db = await openStore(dbName);
   try {
     const tx = db.transaction(['state', 'backups'], 'readwrite');
