@@ -50,6 +50,8 @@ export interface Data {
   plan: Plan;
   rotation?: Rotation;
   rotationWeek?: number;
+  carouselWorkout?: string;
+  difficultyOverride?: { key: string; value: string };
   [key: string]: unknown;
 }
 export const emptyData = (): Data => ({

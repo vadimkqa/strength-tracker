@@ -7,7 +7,7 @@ export interface CarouselHandle {
 interface Props {
   ref?: Ref<CarouselHandle>;
   selected: number;
-  onSelect: (index: number) => void;
+  onSelect: (index: number, wrap?: -1 | 0 | 1) => void;
   plan: Plan;
   week: string;
   rotation?: Rotation;
@@ -31,11 +31,11 @@ export function WorkoutCarousel({
   } | null>(null);
   const suppressClick = useRef(false);
   const [offset, setOffset] = useState(0);
-  const choose = (index: number) => {
+  const choose = (index: number, wrap = false) => {
     setOffset(0);
-    onSelect((index + 4) % 4);
+    onSelect((index + 4) % 4, wrap ? (index < 0 ? -1 : index >= 4 ? 1 : 0) : 0);
   };
-  useImperativeHandle(ref, () => ({ select: choose }));
+  useImperativeHandle(ref, () => ({ select: (index: number) => choose(index) }));
   return (
     <div className="carousel-shell playing-stack-shell">
       <div
@@ -47,7 +47,7 @@ export function WorkoutCarousel({
         onKeyDown={(e) => {
           if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
             e.preventDefault();
-            choose(selected + (e.key === 'ArrowRight' ? 1 : -1));
+            choose(selected + (e.key === 'ArrowRight' ? 1 : -1), true);
           }
         }}
         onPointerDown={(e) => {
@@ -78,9 +78,12 @@ export function WorkoutCarousel({
           suppressClick.current = Math.abs(g.dx) > 8;
           setOffset(0);
           if (Math.abs(g.dx) > 45 && Math.abs(g.dx) > Math.abs(e.clientY - g.y))
-            choose(selected + (g.dx < 0 ? 1 : -1));
+            choose(selected + (g.dx < 0 ? 1 : -1), true);
           else if (Math.abs(g.dx) < 8 && Math.abs(e.clientY - g.y) < 8 && g.index !== null)
-            choose(g.index);
+            choose(
+              g.index === 3 && selected === 0 ? -1 : g.index === 0 && selected === 3 ? 4 : g.index,
+              true,
+            );
           if (e.currentTarget.hasPointerCapture(e.pointerId))
             e.currentTarget.releasePointerCapture(e.pointerId);
         }}
@@ -108,7 +111,9 @@ export function WorkoutCarousel({
               : []
             : plan[templateKey(card.key, week)] || plan[card.key] || [];
           const day = session?.day || (rotation ? 'Unscheduled' : card.key.split(' · ')[0]);
-          const intensity = session?.intensity || (week === 'easy' ? 'easy' : 'hard');
+          const intensity =
+            (index === selected ? (week === 'easy' ? 'easy' : 'hard') : session?.intensity) ||
+            (week === 'easy' ? 'easy' : 'hard');
           const cores = rows.filter((r) => r[3]?.kind === 'core' || /^core\b/i.test(r[0])).length,
             optional = rows.filter((r) => r[3]?.optional).length;
           return (
@@ -128,7 +133,15 @@ export function WorkoutCarousel({
                   position === 'front' ? `Selected ${card.name}` : `Bring ${card.name} to front`
                 }
                 onClick={() => {
-                  if (!suppressClick.current) choose(index);
+                  if (!suppressClick.current)
+                    choose(
+                      index === 3 && selected === 0
+                        ? -1
+                        : index === 0 && selected === 3
+                          ? 4
+                          : index,
+                      true,
+                    );
                 }}
               />
               <span className="stack-peek-label" aria-hidden="true">

@@ -54,7 +54,7 @@ The original app is retained in `legacy/` for upgrade tests and reference; it is
 
 ## Centered workout carousel and TXT plan importing
 
-The Train carousel centers one large card with both neighbors peeking in. It wraps between the first and last workout and supports native touch swipes, mouse drag, arrow buttons, keyboard left/right arrows, and pagination. EASY/HARD and START WORKOUT stay underneath it.
+The Train carousel centers one large card with both neighbors peeking in. It keeps four positions (Bench, DB Press, Hammer Press, Leg) and supports native touch swipes, mouse drag, side-card taps, keyboard left/right arrows, and four pagination dots. EASY/HARD and START WORKOUT stay underneath it.
 
 To review a TXT program:
 
@@ -79,7 +79,7 @@ A block such as `(1:6 no fail; 2:4 no fail; 3:3-6 fail; 4:3-6 fail)` attaches to
 
 Two source ambiguities are intentionally reported: Week 1 Bench pull-ups contains `half fail fail`, and Week 2 DB Press shrugs lists set numbers `1, 3, 4` (missing `2`). Neither is corrected or hidden automatically. A user can edit the prescription or explicitly keep its original wording/numbering. No rest durations are present in GYM.txt, and none are inferred.
 
-After a confirmed rotation import, Train retains the same four cards and adds a Week 1 / Week 2 selector. Each card uses that week's source session, including **Friday legs**. The Hard/Easy switch selects the corresponding scheduled variant/week; it does not reclassify individual exercises. Earlier templates remain stored, while the imported rotation determines new session selection. Already active sessions continue unchanged. The rotation and prescriptions survive reload and JSON backup restore.
+After a confirmed rotation import, Train retains the same four cards and the Week 1 / Week 2 dropdown. Swiping forward from Leg to Bench advances to the next week; swiping backward from Bench to Leg goes to the previous week. Both weeks wrap in either direction. Tapping a neighboring card or using the arrow keys follows the same rule. Selecting a pagination dot keeps the current week. Manually changing the week keeps the selected workout day. Each card uses that week's source session, including **Friday legs**. EASY/HARD starts at the selected session's default and allows a manual session-level override without switching weeks, templates or individual exercise prescriptions. Changing the day or week resets the override to the new session's default. The selected day, week and override persist on the device. Earlier templates remain stored, while the imported rotation determines new session selection. Already active sessions continue unchanged. The rotation and prescriptions survive reload and JSON backup restore.
 
 The earlier generic formats (`4 x 6–8`, `3 sets of 12 reps`, `rest 1:30`, aliases, and explicit compound/isolation defaults) remain supported. An illustrative generic example is in `examples/training-plan-format.txt`; it is never applied automatically.
 
