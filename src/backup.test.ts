@@ -1,3 +1,4 @@
+import { migratePrograms } from './programs';
 import 'fake-indexeddb/auto';
 import { it, expect, vi } from 'vitest';
 import {
@@ -286,5 +287,5 @@ it('rolls back every state and archive write when restoration fails before commi
   }
   const after = await createDatabaseBackup(current, name);
   expect(after.database).toEqual(before.database);
-  expect(await loadData({ getItem: () => null }, name)).toEqual(current);
+  expect(await loadData({ getItem: () => null }, name)).toEqual(migratePrograms(current));
 });

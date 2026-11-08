@@ -138,7 +138,7 @@ test('ambiguous TXT must be edited and assigned before applying; cancellation ke
     await checkbox.check();
   await preview
     .getByRole('checkbox', {
-      name: 'I confirm replacing the active training plan; preserve workout history and unspecified values',
+      name: 'I confirm saving this independent program and making it active; preserve existing programs, history and unspecified values',
       exact: true,
     })
     .check();

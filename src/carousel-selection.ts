@@ -49,6 +49,8 @@ export function chooseWeek(data: Data, week: number): Data {
   };
 }
 export function workoutDifficulty(data: Data, index = carouselIndex(data)) {
+  if (['built-in', 'legacy-txt'].includes(data.trainingProgram?.source.format || ''))
+    return data.week;
   const card = carouselWorkouts(data.rotation, data.rotationWeek, data.trainingProgram, data.week)[
     index
   ];

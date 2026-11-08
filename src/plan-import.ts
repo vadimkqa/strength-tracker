@@ -1,3 +1,4 @@
+import { addProgram } from './programs';
 import { legacyProgram } from './importing/compatibility';
 import { parseSetBlock, setWarnings, type SetPrescription } from './prescriptions';
 /** Pure rule-based TXT parsing. No storage, UI, network or exercise-name inference. */
@@ -41,6 +42,7 @@ export interface DraftExercise {
   warnings: string[];
 }
 export interface PlanDraft {
+  programName?: string;
   rotation: boolean;
   rows: DraftExercise[];
   source: string;
@@ -470,23 +472,19 @@ export function parseAliases(text: string): Aliases {
 /** The only template write entry point. Confirmation and a pre-import snapshot are mandatory. */
 export function applyImportedPlan(current: Data, draft: PlanDraft, confirmed: boolean): Data {
   if (confirmed !== true)
-    throw Error('Explicit confirmation is required before replacing templates.');
+    throw Error('Explicit confirmation is required before saving an independent program.');
   const plan = draftTemplates(draft);
   const sessions = draftSessions(draft);
-  return {
-    ...current,
-    plan: { ...current.plan, ...plan },
-    trainingProgram: legacyProgram(draft, plan, sessions),
-    rotation: undefined,
-    rotationWeek: sessions[0]?.week || 1,
-    difficultyOverride: undefined,
-    ...(draft.rotation
-      ? {
-          rotation: { weeks: [...new Set(sessions.map((s) => s.week))], sessions },
-          rotationWeek: sessions[0]?.week || 1,
-        }
-      : {}),
-  };
+  const program = legacyProgram(draft, plan, sessions);
+  return addProgram(current, {
+    id: crypto.randomUUID(),
+    name: program.name,
+    program,
+    templates: plan,
+    rotation: draft.rotation
+      ? { weeks: [...new Set(sessions.map((s) => s.week))], sessions }
+      : undefined,
+  });
 }
 
 export function draftSessions(draft: PlanDraft): RotationSession[] {

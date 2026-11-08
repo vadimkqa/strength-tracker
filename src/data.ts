@@ -1,3 +1,4 @@
+import { assertLibrary, migratePrograms, mergePrograms, type SavedProgram } from './programs';
 import { assertProgram, type TrainingProgram } from './importing/model';
 import { ensureController, finishController, type WorkoutController } from './controller';
 import { preparePerformance, type PerformanceReference } from './performance';
@@ -35,6 +36,7 @@ export interface Exercise {
   sets: SetEntry[];
 }
 export interface Workout {
+  programId?: string;
   displayName?: string;
   cycleWeek?: number;
   controller?: WorkoutController;
@@ -48,6 +50,9 @@ export interface Workout {
   exercises: Exercise[];
 }
 export interface Data {
+  programs?: SavedProgram[];
+  activeProgramId?: string;
+  programLibraryVersion?: 1;
   trainingProgram?: TrainingProgram;
   history: Workout[];
   active: Workout | null;
@@ -116,6 +121,7 @@ export function parseData(input: unknown): Data {
   )
     throw Error('Invalid workout plan.');
   if (d.trainingProgram) assertProgram(d.trainingProgram);
+  assertLibrary(d);
   if (
     d.rotation &&
     (!Array.isArray(d.rotation.weeks) ||
@@ -163,21 +169,62 @@ export async function loadData(
   const db = await openStore(name);
   try {
     const current = await db.get('state', 'current');
-    if (current) return parseData(current);
-    const raw = storage.getItem(LEGACY_KEY);
-    const data = raw ? parseData(JSON.parse(raw)) : emptyData();
-    const tx = db.transaction(['state', 'backups'], 'readwrite');
-    // Recheck in the same write transaction: concurrent tabs cannot remigrate over new data.
-    const existing = await tx.objectStore('state').get('current');
-    if (existing) {
-      await tx.done;
-      return parseData(existing);
+    if (current) {
+      const parsed = parseData(current);
+      const migrated = migratePrograms(parsed, await db.getAll('backups'));
+      if (migrated !== parsed) {
+        const tx = db.transaction(['state', 'backups'], 'readwrite');
+        try {
+          const latest = await tx.objectStore('state').get('current');
+          if (latest?.programs) {
+            await tx.done;
+            return parseData(latest);
+          }
+          if (JSON.stringify(latest) !== JSON.stringify(current)) {
+            await tx.done;
+            return loadData(storage, name);
+          }
+          await tx
+            .objectStore('backups')
+            .add({ kind: 'before-program-library', data: current, created: Date.now() });
+          await tx.objectStore('state').put(migrated, 'current');
+          await tx.done;
+        } catch (error) {
+          try {
+            tx.abort();
+          } catch {
+            /* Already aborted by IndexedDB. */
+          }
+          await tx.done.catch(() => undefined);
+          throw error;
+        }
+      }
+      return migrated;
     }
-    if (raw)
-      await tx.objectStore('backups').add({ kind: 'localStorage-v1', raw, created: Date.now() });
-    await tx.objectStore('state').put(data, 'current');
-    await tx.done;
-    return data;
+    const raw = storage.getItem(LEGACY_KEY);
+    const data = migratePrograms(raw ? parseData(JSON.parse(raw)) : emptyData());
+    const tx = db.transaction(['state', 'backups'], 'readwrite');
+    try {
+      // Recheck in the same write transaction: concurrent tabs cannot remigrate over new data.
+      const existing = await tx.objectStore('state').get('current');
+      if (existing) {
+        await tx.done;
+        return parseData(existing);
+      }
+      if (raw)
+        await tx.objectStore('backups').add({ kind: 'localStorage-v1', raw, created: Date.now() });
+      await tx.objectStore('state').put(data, 'current');
+      await tx.done;
+      return data;
+    } catch (error) {
+      try {
+        tx.abort();
+      } catch {
+        /* Already aborted by IndexedDB. */
+      }
+      await tx.done.catch(() => undefined);
+      throw error;
+    }
   } finally {
     db.close();
   }
@@ -211,28 +258,11 @@ export function mergeBackup(current: Data, incoming: Data): Data {
   return {
     ...current,
     ...incoming,
+    ...mergePrograms(current, incoming),
     active,
     history: history.sort((a, b) => b.started - a.started),
-    plan: { ...current.plan, ...incoming.plan },
-    rotation: incoming.trainingProgram && !incoming.rotation ? undefined : current.rotation,
-    carouselWorkout: incoming.trainingProgram ? incoming.carouselWorkout : current.carouselWorkout,
-    rotationWeek: incoming.trainingProgram ? incoming.rotationWeek : current.rotationWeek,
-    difficultyOverride: incoming.trainingProgram
-      ? incoming.difficultyOverride
-      : current.difficultyOverride,
-    trainingProgram: incoming.trainingProgram
-      ? structuredClone(incoming.trainingProgram)
-      : incoming.rotation
-        ? undefined
-        : current.trainingProgram,
     week: incoming.week,
     restDefault: incoming.restDefault,
-    ...(incoming.rotation
-      ? {
-          rotation: structuredClone(incoming.rotation),
-          rotationWeek: incoming.rotationWeek || incoming.rotation.weeks[0],
-        }
-      : {}),
   };
 }
 export async function restoreBackup(current: Data, input: unknown, name?: string) {

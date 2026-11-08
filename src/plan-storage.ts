@@ -16,12 +16,22 @@ export async function saveImportedPlan(
   const db = await openStore(dbName);
   try {
     const tx = db.transaction(['state', 'backups'], 'readwrite');
-    await tx
-      .objectStore('backups')
-      .add({ kind: 'before-plan-import', data: current, created: Date.now() });
-    await tx.objectStore('state').put(next, 'current');
-    await tx.done;
-    return next;
+    try {
+      await tx
+        .objectStore('backups')
+        .add({ kind: 'before-plan-import', data: current, created: Date.now() });
+      await tx.objectStore('state').put(next, 'current');
+      await tx.done;
+      return next;
+    } catch (error) {
+      try {
+        tx.abort();
+      } catch {
+        /* Already aborted. */
+      }
+      await tx.done.catch(() => undefined);
+      throw error;
+    }
   } finally {
     db.close();
   }

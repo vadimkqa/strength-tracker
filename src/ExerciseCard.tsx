@@ -1,3 +1,4 @@
+import { removeLiveSet } from './live-sets';
 import { useState } from 'react';
 import type { Exercise, Workout } from './data';
 import { cardExpanded, exerciseComplete, toggleExerciseCard } from './exercise-cards';
@@ -260,13 +261,13 @@ export function ExerciseCard({ workout: w, exercise: e, change }: Props) {
           {e.alternatives?.length ? (
             <p className="muted">Alternatives: {e.alternatives.join(' OR ')}</p>
           ) : null}
-          {e.notes && (
-            <details className="prescription-notes">
-              <summary>Plan notes</summary>
-              <p>{e.notes}</p>
-            </details>
-          )}
           <div className="exercise-card-footer">
+            {e.notes && (
+              <details className="prescription-notes">
+                <summary>Plan notes</summary>
+                <p>{e.notes}</p>
+              </details>
+            )}
             <details className="set-options">
               <summary aria-label={`Set options for ${e.name}`}>Set options</summary>
               <div className="exercise-tools">
@@ -333,39 +334,42 @@ export function ExerciseCard({ workout: w, exercise: e, change }: Props) {
                 </div>
               ))}
             </details>
-            <div className="set-adjust compact-set-adjust">
-              <div>
-                <button
-                  aria-label={`Remove set from ${e.name}`}
-                  disabled={e.sets.length <= 1}
-                  onClick={() => {
-                    if (e.sets.at(-1)?.done && !confirm('Remove the last completed set?')) return;
-                    modify((e, w) => {
-                      if (w.controller?.running?.setId === e.sets.at(-1)?.id)
-                        throw Error('Stop the active set before removing it.');
-                      e.sets.pop();
-                    });
-                  }}
-                >
-                  −
-                </button>
-                <button
-                  aria-label={`Add set to ${e.name}`}
-                  disabled={e.sets.length >= 12}
-                  onClick={() =>
-                    modify((e, w) => {
-                      addPerformanceSet(e);
-                      const added = e.sets.at(-1)!;
-                      added.id = crypto.randomUUID();
-                      if (!w.controller!.selected)
-                        w.controller!.selected = { exerciseId: e.id, setId: added.id };
-                    })
-                  }
-                >
-                  +
-                </button>
-              </div>
-            </div>
+          </div>
+          <div className="set-adjust compact-set-adjust live-set-controls">
+            <button
+              aria-label={`Remove set from ${e.name}`}
+              disabled={e.sets.length <= 1}
+              onClick={() => {
+                const last = e.sets.at(-1)!;
+                const protectedSet =
+                  last.done || last.needsLogging || w.controller?.running?.setId === last.id;
+                if (
+                  protectedSet &&
+                  !confirm(
+                    'Remove this logged or active set? A running set will be stopped. Its log and timing will remain in the session backup.',
+                  )
+                )
+                  return;
+                change((w) => removeLiveSet(w, e.id, true));
+              }}
+            >
+              − Remove set
+            </button>
+            <button
+              aria-label={`Add set to ${e.name}`}
+              disabled={e.sets.length >= 12}
+              onClick={() =>
+                modify((e, w) => {
+                  addPerformanceSet(e);
+                  const added = e.sets.at(-1)!;
+                  added.id = crypto.randomUUID();
+                  if (!w.controller!.selected)
+                    w.controller!.selected = { exerciseId: e.id, setId: added.id };
+                })
+              }
+            >
+              + Add set
+            </button>
           </div>
         </div>
       </div>

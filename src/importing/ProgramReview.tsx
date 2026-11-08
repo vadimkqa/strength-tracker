@@ -531,8 +531,8 @@ export function ProgramReview({ program: p, change, onApply, cancel, stale }: Pr
           disabled={!!problems.length || stale || busy}
           onChange={(e) => setConfirmed(e.target.checked)}
         />
-        I confirm replacing the active training plan; preserve workout history and unspecified
-        values
+        I confirm saving this independent program and making it active; preserve existing programs,
+        history and unspecified values
       </label>
       <button
         className="primary full"
@@ -555,7 +555,8 @@ export function ProgramReview({ program: p, change, onApply, cancel, stale }: Pr
       </button>
       {saved && (
         <p role="status" className="import-success">
-          Plan applied. History, PRs and active sessions were preserved.
+          Plan applied. Saved as an independent program. Previous programs, history, PRs and active
+          sessions were preserved.
         </p>
       )}
       {error && <p role="alert">{error}</p>}

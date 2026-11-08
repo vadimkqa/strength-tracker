@@ -1,3 +1,4 @@
+import { migratePrograms } from './programs';
 import { saveImportedPlan } from './plan-storage';
 import 'fake-indexeddb/auto';
 import { describe, it, expect } from 'vitest';
@@ -163,7 +164,7 @@ describe('applying imported templates safely', () => {
     await expect(
       saveImportedPlan(data, parseTrainingPlan('Unclear'), true, dbname),
     ).rejects.toThrow();
-    expect(await loadData({ getItem: () => null }, dbname)).toEqual(data);
+    expect(await loadData({ getItem: () => null }, dbname)).toEqual(migratePrograms(data));
   });
 });
 

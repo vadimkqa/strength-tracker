@@ -85,7 +85,7 @@ export function carouselWorkouts(
 ): WorkoutCard[] {
   if (program && !rotation) {
     let templates = program.workouts.filter((w) => w.week === week);
-    if (program.source.format === 'legacy-txt') {
+    if (['legacy-txt', 'built-in'].includes(program.source.format)) {
       const slots = [...new Set(templates.map((w) => w.slotId))];
       templates = slots.map(
         (slot) =>
