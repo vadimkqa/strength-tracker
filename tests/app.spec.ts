@@ -128,18 +128,28 @@ test('settings template editing, export, backup merge and malformed import prote
   page,
 }) => {
   page.on('dialog', (d) => d.accept());
+  await page.addInitScript(() =>
+    Object.defineProperty(window, 'showSaveFilePicker', { configurable: true, value: undefined }),
+  );
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'More sets Bench Press', exact: true }).click();
   await expect(page.getByText('5 sets · 180s rest', { exact: true })).toBeVisible();
   const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export JSON backup' }).click();
-  expect((await download).suggestedFilename()).toMatch(/strength-tracker.*\.json/);
+  await page.getByRole('button', { name: 'Save Data', exact: true }).click();
+  expect((await download).suggestedFilename()).toBe('strength-tracker-backup.json');
   await page.locator('#backup').setInputFiles({
     name: 'backup.json',
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(legacy)),
   });
+  await page
+    .getByLabel('I confirm restoring this backup’s plans and settings and merging its history.', {
+      exact: true,
+    })
+    .check();
+  await page.getByRole('button', { name: 'Confirm Restore Data', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Data restored.' })).toBeVisible();
   await page.getByRole('button', { name: 'Progress', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Bench Day', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();

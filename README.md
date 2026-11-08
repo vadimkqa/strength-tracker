@@ -197,3 +197,25 @@ This is a rule-based importer, not an interpreter for arbitrary training prose. 
 The actual uploaded `basic_gym_workout_plan.txt` is a regression fixture: **five weekday sessions and 29 exercises**. Its source note that the remainder was cut off is preserved and flagged; no additional exercises/days or rest durations are invented. Other regressions cover full-body, Upper/Lower, Push/Pull/Legs, A/B, six-day splits, three-week rotations, varying weekly card counts, supersets, optional alternatives, table targets, GYM.txt, all extraction formats, offline extraction and backup/history protection. Browser tests generate review/home screenshots under `test-results/`.
 
 To review locally: `npm ci`, `npm run dev`, then open `http://localhost:5173/strength-tracker/` and use **Settings → Import Training Plan**. Run `npm test`, `npm run build`, and `npm run test:e2e` for validation.
+
+## Save Data on iPhone / iCloud Drive
+
+**Settings → Save Data** prepares a complete, versioned JSON database backup on the device. The file is always suggested as **`strength-tracker-backup.json`**.
+
+On an installed iPhone PWA with file sharing support:
+
+1. Tap **Save Data**.
+2. Choose **Save to Files** in the native Share sheet.
+3. Choose your iCloud Drive folder, keep the suggested filename, and choose **Replace** if iOS offers it for the existing file.
+
+The backup is prepared before the tap so native sharing is called while the user gesture remains active. It first tries a JSON file; a plain-text MIME fallback retains the same `.json` name and exact JSON contents when needed. If file sharing is unavailable, the app uses a supported save picker or browser download. A failed share offers an explicit **Download JSON instead** action; cancelling does not trigger another download. Closing a Share sheet is not reported as proof that a file reached iCloud.
+
+Safari/iOS controls destination selection and replacement. The app cannot silently overwrite an iCloud file, retain Safari folder permissions or promise that a particular system interface will offer Replace. You select the destination each time; the app does not store file/directory handles. Desktop save pickers similarly open afresh for each save.
+
+The file includes the `state` and `backups` IndexedDB stores: all history/completed sets, active workout and timestamp-based timers, previous-performance references, imported/legacy plans and custom exercises, PR-related records, settings, extra stored state, original migration data and safety snapshots. Snapshot reads are transactional and include the newest in-memory data after queued saves. Preparing or cancelling a backup changes no training data. The existing emergency recovery download remains available when normal saving fails.
+
+**Restore Data** opens the native file chooser. JSON is validated before a restore review appears. Review shows its recorded backup date, workout/set/template counts, program, active session, default rest and safety snapshot count. Older JSON backups are still accepted and honestly show **Not recorded (older backup)** rather than inventing a creation date. Backups are limited to 100 MB.
+
+Restore requires a separate checkbox and **Confirm Restore Data** action. It merges history, updates matching plans/settings, keeps the currently running workout, preserves incoming conflicting sessions, and never clears the database first. Source archives are imported without overwriting existing archive IDs, identical archives are deduplicated, and conflicts in extra state records are retained in safety archives. A pre-restore snapshot, imported archives and the resulting state commit in one transaction; failed writes roll the transaction back.
+
+`src/backup.ts` implements format/validation, full database snapshots, delivery and restoration; `src/BackupPanel.tsx` provides the themed Settings controls. Tests cover backup round trips, cancellation, native share activation, MIME fallback, picker/download fallback, validation, confirmation, older JSON, archive collisions, active-session/PR preservation, latest edits, failed-write rollback and offline standalone mobile simulations. Native iOS Share/Files UI is OS-controlled and still needs an on-device smoke test; automated browser coverage uses Chromium mobile emulation with native APIs simulated.
