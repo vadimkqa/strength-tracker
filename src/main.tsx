@@ -1,3 +1,4 @@
+import { carouselIndex, chooseWorkout, chooseWeek, workoutDifficulty } from './carousel-selection';
 import { useKeyboardViewport } from './useKeyboardViewport';
 import { WorkoutScreens } from './WorkoutScreens';
 import {
@@ -75,7 +76,6 @@ function App() {
   useKeyboardViewport();
   const [data, setData] = useState<Data | null>(null),
     [tab, setTab] = useState<Tab>('Train'),
-    [index, setIndex] = useState(0),
     [now, setNow] = useState(Date.now()),
     [error, setError] = useState(''),
     [fatal, setFatal] = useState(''),
@@ -259,14 +259,11 @@ function App() {
           )
             records.set(e.name, { weight: Number(s.weight), reps: Number(s.reps) });
         }
+  const index = carouselIndex(data);
   const rotationSession = data.rotation?.sessions.find(
     (s) => s.week === (data.rotationWeek || 1) && s.workout === cards[index].key,
   );
-  const selectedIntensity = rotationSession
-    ? rotationSession.intensity === 'hard'
-      ? 'heavy'
-      : 'easy'
-    : data.week;
+  const selectedIntensity = workoutDifficulty(data, index);
   return (
     <>
       <main
@@ -317,9 +314,7 @@ function App() {
                     <select
                       id="rotation-week"
                       value={data.rotationWeek || 1}
-                      onChange={(e) =>
-                        change((d) => ({ ...d, rotationWeek: Number(e.target.value) }))
-                      }
+                      onChange={(e) => change((d) => chooseWeek(d, Number(e.target.value)))}
                     >
                       {data.rotation.weeks.map((w) => (
                         <option key={w} value={w}>
@@ -337,7 +332,7 @@ function App() {
                 <WorkoutCarousel
                   ref={carousel}
                   selected={index}
-                  onSelect={setIndex}
+                  onSelect={(i, wrap = 0) => change((d) => chooseWorkout(d, i, wrap))}
                   plan={data.plan}
                   week={selectedIntensity}
                   rotation={data.rotation}
@@ -362,26 +357,12 @@ function App() {
                         key={w}
                         aria-pressed={selectedIntensity === w}
                         className={selectedIntensity === w ? 'chosen' : ''}
-                        disabled={
-                          !!data.rotation &&
-                          !data.rotation.sessions.some(
-                            (s) =>
-                              s.workout === cards[index].key &&
-                              s.intensity === (w === 'heavy' ? 'hard' : 'easy'),
-                          )
-                        }
                         onClick={() =>
-                          change((d) => {
-                            if (d.rotation) {
-                              const matching = d.rotation.sessions.find(
-                                (s) =>
-                                  s.workout === cards[index].key &&
-                                  s.intensity === (w === 'heavy' ? 'hard' : 'easy'),
-                              );
-                              return matching ? { ...d, rotationWeek: matching.week } : d;
-                            }
-                            return { ...d, week: w };
-                          })
+                          change((d) =>
+                            rotationSession
+                              ? { ...d, difficultyOverride: { key: rotationSession.key, value: w } }
+                              : { ...d, week: w },
+                          )
                         }
                       >
                         {w === 'heavy' ? 'HARD' : 'EASY'}
@@ -391,14 +372,16 @@ function App() {
                 </div>
                 <button
                   className="primary start"
-                  disabled={!!data.rotation && !rotationSession}
+                  disabled={
+                    !!data.rotation && (!rotationSession || !data.plan[rotationSession.key])
+                  }
                   onClick={() =>
                     change((d) => ({
                       ...d,
                       active: rotationSession
                         ? createWorkout(
                             rotationSession.key,
-                            rotationSession.intensity === 'hard' ? 'heavy' : 'easy',
+                            selectedIntensity,
                             d.plan,
                             Date.now(),
                             d.history,
