@@ -1,5 +1,6 @@
 import { useImperativeHandle, useRef, useState, type Ref, type CSSProperties } from 'react';
 import { carouselWorkouts, templateKey, type Rotation } from './workouts';
+import type { TrainingProgram } from './importing/model';
 import type { Plan } from './templates';
 export interface CarouselHandle {
   select: (index: number) => void;
@@ -11,6 +12,8 @@ interface Props {
   plan: Plan;
   week: string;
   rotation?: Rotation;
+  program?: TrainingProgram;
+  preferredIntensity?: string;
   rotationWeek?: number;
 }
 export function WorkoutCarousel({
@@ -21,8 +24,11 @@ export function WorkoutCarousel({
   ref,
   rotation,
   rotationWeek,
+  program,
+  preferredIntensity,
 }: Props) {
-  const workouts = carouselWorkouts(rotation, rotationWeek);
+  const workouts = carouselWorkouts(rotation, rotationWeek, program, preferredIntensity);
+  const count = workouts.length;
   const gesture = useRef<{
     x: number;
     y: number;
@@ -34,7 +40,7 @@ export function WorkoutCarousel({
   const [offset, setOffset] = useState(0);
   const choose = (index: number, wrap = false) => {
     setOffset(0);
-    onSelect((index + 4) % 4, wrap ? (index < 0 ? -1 : index >= 4 ? 1 : 0) : 0);
+    onSelect((index + count) % count, wrap ? (index < 0 ? -1 : index >= count ? 1 : 0) : 0);
   };
   useImperativeHandle(ref, () => ({ select: (index: number) => choose(index) }));
   return (
@@ -80,9 +86,18 @@ export function WorkoutCarousel({
           setOffset(0);
           if (Math.abs(g.dx) > 45 && Math.abs(g.dx) > Math.abs(e.clientY - g.y))
             choose(selected + (g.dx < 0 ? 1 : -1), true);
-          else if (Math.abs(g.dx) < 8 && Math.abs(e.clientY - g.y) < 8 && g.index !== null)
+          else if (
+            Math.abs(g.dx) < 8 &&
+            Math.abs(e.clientY - g.y) < 8 &&
+            g.index !== null &&
+            g.index !== selected
+          )
             choose(
-              g.index === 3 && selected === 0 ? -1 : g.index === 0 && selected === 3 ? 4 : g.index,
+              count > 2 && g.index === count - 1 && selected === 0
+                ? -1
+                : g.index === 0 && selected === count - 1
+                  ? count
+                  : g.index,
               true,
             );
           if (e.currentTarget.hasPointerCapture(e.pointerId))
@@ -94,27 +109,34 @@ export function WorkoutCarousel({
         }}
       >
         {workouts.map((card, index) => {
-          const distance = (index - selected + 4) % 4;
+          const distance = (index - selected + count) % count;
           const position =
             distance === 0
               ? 'front'
               : distance === 1
                 ? 'next'
-                : distance === 3
+                : distance === count - 1
                   ? 'previous'
                   : 'back';
           const session = rotation?.sessions.find(
             (s) => s.week === rotationWeek && s.workout === card.key,
           );
-          const rows = rotation
-            ? session
-              ? plan[session.key] || []
-              : []
-            : plan[templateKey(card.key, week)] || plan[card.key] || [];
-          const day = session?.day || (rotation ? 'Unscheduled' : card.day);
+          const rows = card.templateKey
+            ? plan[card.templateKey] || []
+            : rotation
+              ? session
+                ? plan[session.key] || []
+                : []
+              : plan[templateKey(card.key, week)] || plan[card.key] || [];
+          const day = card.templateKey
+            ? card.day
+            : session?.day || (rotation ? 'Unscheduled' : card.day);
           const intensity =
-            (index === selected ? (week === 'easy' ? 'easy' : 'hard') : session?.intensity) ||
-            (week === 'easy' ? 'easy' : 'hard');
+            index === selected
+              ? week
+              : card.templateKey
+                ? card.intensity
+                : session?.intensity || week;
           const cores = rows.filter((r) => r[3]?.kind === 'core' || /^core\b/i.test(r[0])).length,
             optional = rows.filter((r) => r[3]?.optional).length;
           return (
@@ -134,12 +156,12 @@ export function WorkoutCarousel({
                   position === 'front' ? `Selected ${card.name}` : `Bring ${card.name} to front`
                 }
                 onClick={() => {
-                  if (!suppressClick.current)
+                  if (!suppressClick.current && index !== selected)
                     choose(
-                      index === 3 && selected === 0
+                      count > 2 && index === count - 1 && selected === 0
                         ? -1
-                        : index === 0 && selected === 3
-                          ? 4
+                        : index === 0 && selected === count - 1
+                          ? count
                           : index,
                       true,
                     );
@@ -150,7 +172,9 @@ export function WorkoutCarousel({
               </span>
               <div className="stack-card-top">
                 <span>{day}</span>
-                <span>{rotation ? `Week ${rotationWeek}` : 'YOUR TRAINING'}</span>
+                <span>
+                  {rotation || program?.rotation ? `Week ${rotationWeek}` : 'YOUR TRAINING'}
+                </span>
               </div>
               <div className="photo">
                 <img
@@ -158,7 +182,13 @@ export function WorkoutCarousel({
                   src={`${import.meta.env.BASE_URL}photos/${card.photo}.jpg`}
                   alt={card.caption}
                 />
-                <span className="stack-intensity">{intensity === 'hard' ? 'HEAVY' : 'EASY'}</span>
+                <span className="stack-intensity">
+                  {intensity
+                    ? /^(hard|heavy)$/i.test(intensity)
+                      ? 'HEAVY'
+                      : intensity.toUpperCase()
+                    : 'UNSPECIFIED'}
+                </span>
               </div>
               <div className="card-caption">
                 <p className="eyebrow">{card.muscles}</p>
@@ -176,7 +206,7 @@ export function WorkoutCarousel({
         })}
       </div>
       <span className="visually-hidden" aria-live="polite">
-        {workouts[selected].name} · {selected + 1} / 4
+        {workouts[selected]?.name} · {selected + 1} / {count}
       </span>
     </div>
   );

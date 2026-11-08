@@ -1,3 +1,4 @@
+import { assertProgram, type TrainingProgram } from './importing/model';
 import { ensureController, finishController, type WorkoutController } from './controller';
 import { preparePerformance, type PerformanceReference } from './performance';
 import type { SetPrescription } from './prescriptions';
@@ -17,6 +18,7 @@ export interface SetEntry {
   prescription?: SetPrescription;
 }
 export interface Exercise {
+  groupLabel?: string;
   skipped?: boolean;
   exerciseKey?: string;
   previousPerformance?: PerformanceReference;
@@ -32,6 +34,8 @@ export interface Exercise {
   sets: SetEntry[];
 }
 export interface Workout {
+  displayName?: string;
+  cycleWeek?: number;
   controller?: WorkoutController;
   id: string;
   name: string;
@@ -43,6 +47,7 @@ export interface Workout {
   exercises: Exercise[];
 }
 export interface Data {
+  trainingProgram?: TrainingProgram;
   history: Workout[];
   active: Workout | null;
   week: string;
@@ -103,13 +108,44 @@ export function parseData(input: unknown): Data {
             (r) =>
               Array.isArray(r) &&
               typeof r[0] === 'string' &&
-              (r[1] === null || (Number.isInteger(r[1]) && r[1] > 0 && r[1] <= 12)) &&
-              (r[2] === null || (Number.isFinite(r[2]) && r[2] > 0)),
+              (r[1] === null || (Number.isInteger(r[1]) && r[1] > 0 && r[1] <= 100)) &&
+              (r[2] === null || (Number.isFinite(r[2]) && r[2] >= 0)),
           ),
       ))
   )
     throw Error('Invalid workout plan.');
-  return { ...emptyData(), ...d, plan: d.plan || defaultPlan() };
+  if (d.trainingProgram) assertProgram(d.trainingProgram);
+  if (
+    d.rotation &&
+    (!Array.isArray(d.rotation.weeks) ||
+      !d.rotation.weeks.length ||
+      !Array.isArray(d.rotation.sessions) ||
+      !d.rotation.sessions.length ||
+      !d.rotation.sessions.every(
+        (s) =>
+          s &&
+          Number.isInteger(s.week) &&
+          typeof s.key === 'string' &&
+          typeof s.workout === 'string' &&
+          typeof s.day === 'string',
+      ))
+  )
+    throw Error('Invalid workout rotation. Original data has been preserved.');
+  const availableWeeks =
+    d.rotation?.sessions.map((s) => s.week) || d.trainingProgram?.workouts.map((w) => w.week);
+
+  return {
+    ...emptyData(),
+    ...d,
+    ...(availableWeeks?.length
+      ? {
+          rotationWeek: availableWeeks.includes(d.rotationWeek!)
+            ? d.rotationWeek
+            : availableWeeks[0],
+        }
+      : {}),
+    plan: d.plan || defaultPlan(),
+  };
 }
 export async function openStore(name = 'strength-tracker-v2') {
   return openDB(name, 1, {
@@ -176,6 +212,17 @@ export function mergeBackup(current: Data, incoming: Data): Data {
     active,
     history: history.sort((a, b) => b.started - a.started),
     plan: { ...current.plan, ...incoming.plan },
+    rotation: incoming.trainingProgram && !incoming.rotation ? undefined : current.rotation,
+    carouselWorkout: incoming.trainingProgram ? incoming.carouselWorkout : current.carouselWorkout,
+    rotationWeek: incoming.trainingProgram ? incoming.rotationWeek : current.rotationWeek,
+    difficultyOverride: incoming.trainingProgram
+      ? incoming.difficultyOverride
+      : current.difficultyOverride,
+    trainingProgram: incoming.trainingProgram
+      ? structuredClone(incoming.trainingProgram)
+      : incoming.rotation
+        ? undefined
+        : current.trainingProgram,
     week: incoming.week,
     restDefault: incoming.restDefault,
     ...(incoming.rotation
@@ -209,6 +256,7 @@ export function createWorkout(
   plan: Plan,
   now = Date.now(),
   history: Workout[] = [],
+  templateInfo?: { displayName: string; cycleWeek: number },
 ): Workout {
   const keys = Object.keys(defaultPlan());
   const key = templateKey(name, week);
@@ -218,6 +266,7 @@ export function createWorkout(
         id: crypto.randomUUID(),
         name,
         week,
+        ...templateInfo,
         started: now,
         restEnd: null,
         restSeconds: null,
@@ -233,6 +282,8 @@ export function createWorkout(
           rest,
           ...(prescription
             ? {
+                exerciseKey: prescription.exerciseId,
+                groupLabel: prescription.groupLabel,
                 targetReps: prescription.reps,
                 notes: prescription.notes,
                 exerciseIntensity: prescription.exerciseIntensity,

@@ -1811,3 +1811,18 @@ main.active-workout {
   scroll-margin-top: calc(114px + env(safe-area-inset-top));
   scroll-margin-bottom: calc(200px + env(safe-area-inset-bottom));
 }
+.program-review fieldset {
+  min-width: 0;
+  border: 1px solid #382a43;
+  border-radius: 10px;
+  margin: 12px 0;
+}
+.program-review .review-selectors label {
+  margin: 0;
+}
+.program-review small {
+  overflow-wrap: anywhere;
+}
+.pagination {
+  flex-wrap: wrap;
+}

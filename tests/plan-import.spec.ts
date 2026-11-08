@@ -122,26 +122,28 @@ test('ambiguous TXT must be edited and assigned before applying; cancellation ke
   await page.getByText('Source text and workout aliases', { exact: true }).click();
   await page.locator('#plan-source').fill('Unrecognized Day:\nOdd movement — 3-4 sets, rest 90');
   await page.getByRole('button', { name: 'Parse TXT', exact: true }).click();
+  const preview = page.getByLabel('Editable program preview', { exact: true });
   await expect(
-    page.getByRole('button', { name: 'Apply imported plan', exact: true }),
+    page.getByRole('button', { name: 'Apply imported program', exact: true }),
   ).toBeDisabled();
-  await page.locator('.review-exercise > summary').first().click();
-  await page.locator('.exercise-editor > summary').first().click();
-  await page
-    .getByLabel('WORKOUT ASSIGNMENT', { exact: true })
-    .selectOption('Thursday · Back focus');
-  await page.getByLabel('SESSION INTENSITY', { exact: true }).selectOption('easy');
-  await page.getByLabel('SETS', { exact: true }).fill('3');
-  await page.getByLabel('REST (SECONDS)', { exact: true }).fill('90');
-  await page.getByLabel('Keep reps unspecified — do not invent a target').check();
-  await page
-    .getByLabel('I reviewed these source warnings; keep unedited values exactly as written')
-    .check();
-  await page
-    .getByLabel('I confirm applying these templates, preserving all unspecified values as unset')
+  await preview.getByText('Edit workout / schedule', { exact: true }).click();
+  await preview.getByLabel('WORKOUT NAME', { exact: true }).fill('Custom back workout');
+  await preview.locator('.review-exercise > summary').first().click();
+  await preview.getByText('Edit exercise details', { exact: true }).click();
+  await preview.getByLabel('SET COUNT', { exact: true }).fill('3');
+  // Missing reps/rest remain unset; source ambiguity must be explicitly reviewed.
+  for (const checkbox of await preview
+    .locator('.review-exercise > label input[type=checkbox]')
+    .all())
+    await checkbox.check();
+  await preview
+    .getByRole('checkbox', {
+      name: 'I confirm replacing the active training plan; preserve workout history and unspecified values',
+      exact: true,
+    })
     .check();
   await expect(
-    page.getByRole('button', { name: 'Apply imported plan', exact: true }),
+    page.getByRole('button', { name: 'Apply imported program', exact: true }),
   ).toBeEnabled();
   expect(await state(page)).toEqual(before);
   await page.getByRole('button', { name: 'Cancel preview', exact: true }).click();

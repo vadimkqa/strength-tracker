@@ -148,3 +148,52 @@ A focused form control's visual viewport updates the fixed navigation/action off
 ### Compact active workout logging
 
 Exercises uses a single sticky column header beneath the Exercises/Timer tabs, shared across the entire exercise list. Input rows keep 44px touch targets and 16px numeric text, with previous performance and set targets on a compact detail line underneath. The row-level skip icon has an exercise/set-specific accessible name. Active highlighting, the spinner, draggable live timer, keyboard positioning and horizontal screen navigation remain available. Mobile regressions cover long scrolling through imported exercises at 375×667, 390×844 and 393×852.
+
+## Universal, local training-plan importing
+
+Settings accepts **TXT, pasted text, text-based PDF, DOCX, CSV and XLSX**. Extraction runs in the browser with bundled libraries; no API key, server or paid service is used. The installed PWA precaches the extraction chunks and PDF worker so imports also work offline.
+
+The importer separates four stages:
+
+- `src/importing/extraction.ts` reads document text, paragraphs and tables, with page/sheet references. It never inserts document HTML into the app or executes spreadsheet formulas.
+- `src/importing/parser.ts` parses supported headings, exercise prescriptions and table columns into the versioned model in `model.ts`.
+- `ProgramReview.tsx` edits program, week, workout, exercise and per-set details. Missing/ambiguous information and unsupported sections need explicit review. Unknown values can remain unset. Saving also requires a separate replacement confirmation.
+- `saving.ts` validates and compiles templates; `plan-storage.ts` writes a pre-import snapshot and the new plan in one IndexedDB transaction. History, records and already active sessions are preserved.
+
+Schema version 1 contains program and template identifiers, source text/references, workout order, optional weekdays and multi-week rotation, exact exercise identities/order, per-set reps/weight/RPE/RIR/effort/rest, optional exercises, alternatives, superset/circuit memberships, and review warnings. Explicit targets with an unknown set count are retained as unallocated/default targets; the importer does not create sets to accommodate them. Planned targets never become logged performance automatically. A future parser can produce the same model and reuse validation, preview and storage.
+
+### Supported source structures
+
+Use weekday headings (`Monday – Chest + Triceps`), `Workout A`, `Session B`, `Day 1: Upper`, `Day A`, `Upper/Lower`, `Push/Pull/Legs`, `Full Body A`, or another explicit heading ending in a colon. Optional numeric week headings can include titles (`Week 3 – Build`). Without weekdays, source workout order is retained. Example:
+
+```text
+Program: Alternating strength
+Week 1
+Workout A
+- Squat 3 x 5 @ 80 kg RPE 8 rest 2 min
+Superset B:
+B1. Row 3 x 10 rest 90s
+Optional: Curl 2 x 12 rest 60s
+End superset
+Workout B
+- Deadlift 2 x 5 RIR 2
+Optional: Plank or Dead Bug
+```
+
+`Optional:` is supported as a line prefix. Group headings (`Superset A:`, `Circuit 3 rounds:`) retain relationships and explicitly supplied rounds; rounds are not silently converted into exercise set counts. Indexed prescription continuations retain source set numbering. Multiple/ranged prescriptions that cannot be represented reliably are flagged, with the full source retained for correction.
+
+CSV/XLSX and DOCX tables recognize an **Exercise** column plus **Workout** (or a preceding document workout heading). Optional columns include Week, Day, Sets, Set/Set number, Reps, Weight, Unit, RPE, RIR, Effort, Rest seconds, Optional, Alternatives, Superset, Circuit, Group and Notes. A Rest column needs units, e.g. `90s`; `Rest seconds` explicitly supplies the unit. Unknown nonempty columns are reported. Quoted CSV cells and all XLSX sheets are extracted. Unsupported tables remain source material for manual correction instead of creating guessed exercises.
+
+### Carousel and compatibility
+
+The home deck uses the imported number of workout templates for the selected week, including weeks with different counts. Weekday metadata controls chronological ordering; unscheduled programs retain source order. Swiping across an end advances/reverses the supplied rotation and updates the week dropdown. One- and two-card decks avoid duplicated side cards and accidental week changes on a front-card tap. The selected template ID determines what Start Workout loads.
+
+The established GYM.txt parser remains a compatibility adapter: its two weeks, eight templates, Friday legs, exact set numbering and exercise-level intensities are preserved, and confirmed imports also gain a normalized program representation. Classic Hard/Easy variants remain accessible. Existing JSON backups and legacy IndexedDB/localStorage data remain readable; versioned program backups are structurally validated before restore.
+
+### Limits and review
+
+This is a rule-based importer, not an interpreter for arbitrary training prose. Unsupported sections, ambiguous prescriptions and missing fields are visible in review. PDF reading order is explicitly flagged for comparison with the original; image-only/scanned PDFs require OCR outside this importer. Password-protected, corrupt or unsupported documents report extraction errors without changing saved templates. Limits are 10 MB per file, 32 MB expanded archives, 100 PDF pages, and 2 MB / 10,000 extracted lines.
+
+The actual uploaded `basic_gym_workout_plan.txt` is a regression fixture: **five weekday sessions and 29 exercises**. Its source note that the remainder was cut off is preserved and flagged; no additional exercises/days or rest durations are invented. Other regressions cover full-body, Upper/Lower, Push/Pull/Legs, A/B, six-day splits, three-week rotations, varying weekly card counts, supersets, optional alternatives, table targets, GYM.txt, all extraction formats, offline extraction and backup/history protection. Browser tests generate review/home screenshots under `test-results/`.
+
+To review locally: `npm ci`, `npm run dev`, then open `http://localhost:5173/strength-tracker/` and use **Settings → Import Training Plan**. Run `npm test`, `npm run build`, and `npm run test:e2e` for validation.
