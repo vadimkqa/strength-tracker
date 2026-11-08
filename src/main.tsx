@@ -113,7 +113,7 @@ function App() {
         if (!lock) {
           if (alive)
             setFatal(
-              'Strength Tracker is already open in another tab. Close that tab, then reload here to protect your workout data.',
+              'Strength Trainer is already open in another tab. Close that tab, then reload here to protect your workout data.',
             );
           return;
         }
@@ -240,7 +240,7 @@ function App() {
   if (!data)
     return (
       <main>
-        <h1>Strength Tracker</h1>
+        <h1>Strength Trainer</h1>
         <p>Opening your training journal…</p>
       </main>
     );
@@ -286,13 +286,18 @@ function App() {
       >
         <header>
           <div className="brand">
-            <span className="brand-mark">
-              ST<span>◆</span>
-            </span>
-            <span>
-              STRENGTH
-              <br />
-              <b>TRACKER</b>
+            <img
+              className="brand-mark"
+              src={`${import.meta.env.BASE_URL}icon-st-v2-192.png`}
+              alt="Strength Trainer sT dumbbell logo"
+              width="44"
+              height="44"
+            />
+            <span className="brand-owner">VADIMKQA</span>
+            <span className="brand-divider" aria-hidden="true" />
+            <span className="brand-wordmark">
+              <span>STRENGTH</span>
+              <b>TRAINER</b>
             </span>
           </div>
           <span className="edition">
@@ -1038,7 +1043,7 @@ function App() {
                 }}
               />
             </section>
-            <p className="footnote">STRENGTH TRACKER 2.0 · LOCAL FIRST</p>
+            <p className="footnote">STRENGTH TRAINER 2.0 · LOCAL FIRST</p>
           </>
         )}
         <p className="save-status" aria-live="polite">

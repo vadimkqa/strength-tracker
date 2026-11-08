@@ -69,34 +69,49 @@ header {
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 10px;
-  letter-spacing: 2.2px;
-  line-height: 1.6;
-}
-.brand b {
-  font-weight: 500;
-  color: var(--muted);
+  gap: clamp(8px, 2.4vw, 12px);
+  min-width: 0;
+  white-space: nowrap;
 }
 .brand-mark {
-  font-size: 21px;
-  font-weight: 900;
-  letter-spacing: -2px;
-  border: 1px solid #4c3266;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  padding: 8px 10px;
-  height: 46px;
-  color: var(--highlight);
-  gap: 3px;
+  display: block;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  border-radius: 10px;
 }
-.brand-mark span {
-  font-size: 10px;
-  align-self: flex-start;
-  margin-top: 2px;
+.brand-owner {
+  color: #f5f1fa;
+  font-size: clamp(9px, 2.6vw, 11px);
+  font-weight: 500;
+  letter-spacing: clamp(1.5px, 0.48vw, 2.3px);
+}
+.brand-divider {
+  flex: 0 0 1px;
+  width: 1px;
+  height: 32px;
+  background: var(--purple);
+  opacity: 0.85;
+}
+.brand-wordmark {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: #f5f1fa;
+  font-size: clamp(9px, 2.6vw, 11px);
+  font-weight: 600;
+  letter-spacing: clamp(1.5px, 0.48vw, 2.3px);
+  line-height: 1.5;
+}
+.brand-wordmark b {
+  color: var(--purple);
+  font-weight: 600;
 }
 .edition {
+  flex-shrink: 0;
+  margin-left: 10px;
+  white-space: nowrap;
   font-size: 11px;
   color: var(--muted);
   letter-spacing: 1px;
@@ -1390,13 +1405,8 @@ main.home-screen {
     margin-bottom: 8px;
   }
   .home-screen .brand-mark {
-    height: 38px;
-    padding: 5px 9px;
-    font-size: 19px;
-  }
-  .home-screen .brand {
-    font-size: 9px;
-    gap: 9px;
+    width: 40px;
+    height: 40px;
   }
   .home-screen .rotation-selection {
     margin: 0 0 8px;
