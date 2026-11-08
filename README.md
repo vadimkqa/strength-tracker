@@ -54,7 +54,7 @@ The original app is retained in `legacy/` for upgrade tests and reference; it is
 
 ## Centered workout carousel and TXT plan importing
 
-The Train carousel centers one large card with both neighbors peeking in. It keeps four positions (Bench, DB Press, Hammer Press, Leg) and supports native touch swipes, mouse drag, side-card taps, keyboard left/right arrows, and four pagination dots. EASY/HARD and START WORKOUT stay underneath it.
+The Train carousel centers one large card with both neighbors peeking in. It keeps four positions (Bench, DB Press, Leg, Hammer Press) and supports native touch swipes, mouse drag, side-card taps, keyboard left/right arrows, and four pagination dots. EASY/HARD and START WORKOUT stay underneath it.
 
 To review a TXT program:
 
@@ -79,7 +79,7 @@ A block such as `(1:6 no fail; 2:4 no fail; 3:3-6 fail; 4:3-6 fail)` attaches to
 
 Two source ambiguities are intentionally reported: Week 1 Bench pull-ups contains `half fail fail`, and Week 2 DB Press shrugs lists set numbers `1, 3, 4` (missing `2`). Neither is corrected or hidden automatically. A user can edit the prescription or explicitly keep its original wording/numbering. No rest durations are present in GYM.txt, and none are inferred.
 
-After a confirmed rotation import, Train retains the same four cards and the Week 1 / Week 2 dropdown. Swiping forward from Leg to Bench advances to the next week; swiping backward from Bench to Leg goes to the previous week. Both weeks wrap in either direction. Tapping a neighboring card or using the arrow keys follows the same rule. Selecting a pagination dot keeps the current week. Manually changing the week keeps the selected workout day. Each card uses that week's source session, including **Friday legs**. EASY/HARD starts at the selected session's default and allows a manual session-level override without switching weeks, templates or individual exercise prescriptions. Changing the day or week resets the override to the new session's default. The selected day, week and override persist on the device. Earlier templates remain stored, while the imported rotation determines new session selection. Already active sessions continue unchanged. The rotation and prescriptions survive reload and JSON backup restore.
+After a confirmed rotation import, Train retains the same four cards and the Week 1 / Week 2 dropdown. Cards sort by the selected week's imported weekday metadata: Tuesday Bench, Thursday DB Press, Friday Legs, Saturday Hammer Press in GYM.txt. Swiping forward from Saturday Hammer Press to Tuesday Bench advances to the next week; swiping backward from Bench to Hammer Press goes to the previous week. Both weeks wrap in either direction. Tapping a neighboring card or using the arrow keys follows the same rule. Selecting a pagination dot keeps the current week. Manually changing the week keeps the selected workout day. Each card uses that week's source session, including **Friday legs**. EASY/HARD starts at the selected session's default and allows a manual session-level override without switching weeks, templates or individual exercise prescriptions. Changing the day or week resets the override to the new session's default. The selected day, week and override persist on the device. Earlier templates remain stored, while the imported rotation determines new session selection. Already active sessions continue unchanged. The rotation and prescriptions survive reload and JSON backup restore.
 
 The earlier generic formats (`4 x 6–8`, `3 sets of 12 reps`, `rest 1:30`, aliases, and explicit compound/isolation defaults) remain supported. An illustrative generic example is in `examples/training-plan-format.txt`; it is never applied automatically.
 
@@ -144,3 +144,7 @@ Mobile/touch and iOS form controls use at least 16px computed font size to preve
 A focused form control's visual viewport updates the fixed navigation/action offset and the scroll reserve when the keyboard reduces usable height. The bubble recomputes its bounds after that update. Pinch zoom is intentionally excluded from keyboard-offset compensation. No workout or stored data changes are made by this fix.
 
 `tests/iphone-focus.spec.ts` verifies all form font sizes, weight/reps focus geometry, scale/width and overflow at 375×667, 390×844 and 393×852, plus simulated keyboard viewport offsets and pinch-scale exclusion. These are Chromium mobile tests; native Safari auto-zoom and physical keyboard behavior still require an on-device check.
+
+### Compact active workout logging
+
+Exercises uses a single sticky column header beneath the Exercises/Timer tabs, shared across the entire exercise list. Input rows keep 44px touch targets and 16px numeric text, with previous performance and set targets on a compact detail line underneath. The row-level skip icon has an exercise/set-specific accessible name. Active highlighting, the spinner, draggable live timer, keyboard positioning and horizontal screen navigation remain available. Mobile regressions cover long scrolling through imported exercises at 375×667, 390×844 and 393×852.

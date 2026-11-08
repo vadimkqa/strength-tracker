@@ -2,6 +2,7 @@
 export const workouts = [
   {
     name: 'Bench Day',
+    day: 'Tuesday',
     key: 'Tuesday · Bench focus',
     muscles: 'CHEST · ARMS · CORE',
     photo: 'bench',
@@ -9,6 +10,7 @@ export const workouts = [
   },
   {
     name: 'DB Press Day',
+    day: 'Thursday',
     key: 'Thursday · Back focus',
     muscles: 'BACK · SHOULDERS · ARMS',
     photo: 'pullups',
@@ -16,6 +18,7 @@ export const workouts = [
   },
   {
     name: 'Hammer Press Day',
+    day: 'Saturday',
     key: 'Saturday · Chest focus',
     muscles: 'CHEST · SHOULDERS · TRICEPS',
     photo: 'hammer',
@@ -23,6 +26,7 @@ export const workouts = [
   },
   {
     name: 'Leg Day',
+    day: 'Friday',
     key: 'Sunday · Legs',
     muscles: 'QUADS · GLUTES · CALVES',
     photo: 'legs',
@@ -53,4 +57,20 @@ export interface Rotation {
 }
 export function rotationKey(workout: WorkoutId, week: number, day: string, intensity: string) {
   return `Week ${week} · ${day || 'Day unspecified'} · ${workouts.find((w) => w.key === workout)!.name} · ${intensity === 'easy' ? 'Easy' : 'Hard'}`;
+}
+
+// Sort the presentation only; stable workout/template IDs and source sessions stay intact.
+const weekdays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+function weekdayIndex(day: string) {
+  const normalized = day.trim().toLowerCase();
+  const index = weekdays.findIndex((d) => normalized === d || normalized === d.slice(0, 3));
+  return index < 0 ? 7 : index;
+}
+export function carouselWorkouts(rotation?: Rotation, week = 1) {
+  return [...workouts].sort((a, b) => {
+    const day = (workout: (typeof workouts)[number]) =>
+      rotation?.sessions.find((s) => s.week === week && s.workout === workout.key)?.day ||
+      workout.day;
+    return weekdayIndex(day(a)) - weekdayIndex(day(b));
+  });
 }

@@ -1713,3 +1713,101 @@ main:not(.active-workout) {
     max-width: 100%;
   }
 }
+/* One shared logging header stays with the screen navigation across all exercises. */
+main.active-workout {
+  overflow: visible; /* A hidden overflow ancestor prevents viewport-based sticky positioning. */
+  --logging-columns: 44px minmax(0, 1fr) minmax(0, 1fr) 44px 44px;
+  scroll-padding-top: calc(106px + env(safe-area-inset-top));
+}
+.workout-sticky-controls {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding-top: env(safe-area-inset-top);
+  background: rgba(19, 13, 26, 0.98);
+  border-bottom: 1px solid #382a43;
+}
+.workout-sticky-controls .workout-screen-tabs {
+  position: static;
+  background: transparent;
+  padding: 6px 0;
+}
+.active-workout .performance-row {
+  grid-template-columns: var(--logging-columns);
+  gap: 3px 4px;
+}
+.workout-sticky-controls .set-head {
+  padding: 4px 13px 7px;
+  margin: 0;
+}
+.active-workout .exercise {
+  padding: 12px;
+  scroll-margin-top: calc(108px + env(safe-area-inset-top));
+}
+.exercise .performance-row {
+  margin: 4px 0;
+  padding: 3px 0;
+  border-bottom: 1px solid #302339;
+  scroll-margin-top: calc(110px + env(safe-area-inset-top));
+  scroll-margin-bottom: calc(195px + env(safe-area-inset-bottom));
+}
+.exercise .performance-row.active-set {
+  border-left: 0;
+  box-shadow: inset 2px 0 var(--purple);
+}
+.exercise .performance-row input,
+.exercise .performance-row button {
+  min-height: 44px;
+  height: 44px;
+  min-width: 0;
+  padding: 6px 0;
+}
+.exercise .performance-row input {
+  font-size: 16px;
+}
+.exercise .performance-row .select-set {
+  grid-column: 1;
+  grid-row: 1;
+}
+.exercise .performance-row input:nth-of-type(1) {
+  grid-column: 2;
+  grid-row: 1;
+}
+.exercise .performance-row input:nth-of-type(2) {
+  grid-column: 3;
+  grid-row: 1;
+}
+.exercise .performance-row .check {
+  grid-column: 4;
+  grid-row: 1;
+}
+.exercise .performance-row .skip-set {
+  grid-column: 5;
+  grid-row: 1;
+  width: 44px;
+  font-size: 18px;
+  color: var(--muted);
+  border-color: transparent;
+}
+.set-details {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  padding: 0 4px;
+}
+.exercise .performance-row .previous-set,
+.exercise .performance-row .prescription-per-set {
+  font-size: 11px;
+  line-height: 1.35;
+  padding: 0;
+  overflow-wrap: anywhere;
+}
+.active-workout .compact-set-adjust button {
+  width: 44px;
+  min-height: 44px;
+}
+.active-workout input {
+  scroll-margin-top: calc(114px + env(safe-area-inset-top));
+  scroll-margin-bottom: calc(200px + env(safe-area-inset-bottom));
+}

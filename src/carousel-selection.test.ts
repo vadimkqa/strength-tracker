@@ -4,7 +4,7 @@ import gym from '../tests/fixtures/GYM.txt?raw';
 import { parseTrainingPlan, applyImportedPlan } from './plan-import';
 import { emptyData, createWorkout, saveData, loadData } from './data';
 import { chooseWorkout, chooseWeek, carouselIndex, workoutDifficulty } from './carousel-selection';
-import { workouts } from './workouts';
+import { workouts, carouselWorkouts } from './workouts';
 const draft = parseTrainingPlan(gym);
 draft.rows.forEach((r) => (r.reviewed = true));
 const base = applyImportedPlan(emptyData(), draft, true);
@@ -46,7 +46,9 @@ it('persists day, week and override without changing plans, history or an active
   completed.exercises[0].sets[0] = { weight: '100', reps: '8', done: true };
   let d = chooseWorkout({ ...base, history: [completed] }, 2);
   d = chooseWeek(d, 2);
-  const session = d.rotation!.sessions.find((s) => s.week === 2 && s.workout === workouts[2].key)!;
+  const session = d.rotation!.sessions.find(
+    (s) => s.week === 2 && s.workout === carouselWorkouts(d.rotation, d.rotationWeek)[2].key,
+  )!;
   d.difficultyOverride = { key: session.key, value: 'heavy' };
   d.active = createWorkout('Tuesday · Bench focus', 'heavy', d.plan);
   const active = structuredClone(d.active),
@@ -60,4 +62,59 @@ it('persists day, week and override without changing plans, history or an active
   expect(restored.plan).toEqual(plan);
   expect(restored.history).toEqual([completed]);
   expect(restored.difficultyOverride).toEqual(d.difficultyOverride);
+});
+
+it('orders both imported weeks by actual weekday without mutating template data', () => {
+  const before = structuredClone(base);
+  for (const week of [1, 2]) {
+    const cards = carouselWorkouts(base.rotation, week);
+    expect(cards.map((c) => c.name)).toEqual([
+      'Bench Day',
+      'DB Press Day',
+      'Leg Day',
+      'Hammer Press Day',
+    ]);
+    expect(
+      cards.map(
+        (c) => base.rotation!.sessions.find((s) => s.week === week && s.workout === c.key)!.day,
+      ),
+    ).toEqual(['Tuesday', 'Thursday', 'Friday', 'Saturday']);
+    for (let i = 0; i < 4; i++) {
+      const d = chooseWorkout(chooseWeek(base, week), i);
+      const source = base.rotation!.sessions.find(
+        (s) => s.week === week && s.workout === cards[carouselIndex(d)].key,
+      )!;
+      const active = createWorkout(source.key, workoutDifficulty(d), d.plan);
+      expect(active.exercises.map((e) => e.name)).toEqual(base.plan[source.key].map((e) => e[0]));
+      expect(workoutDifficulty(d)).toBe(source.intensity === 'hard' ? 'heavy' : 'easy');
+    }
+  }
+  expect(base).toEqual(before);
+});
+it('derives ordering from changed weekday metadata and preserves selection by stable ID', () => {
+  const d = structuredClone(base);
+  d.rotation!.sessions.find((s) => s.week === 1 && s.workout === workouts[2].key)!.day =
+    'Wednesday';
+  const cards = carouselWorkouts(d.rotation, 1);
+  expect(cards.map((c) => c.name)).toEqual([
+    'Bench Day',
+    'Hammer Press Day',
+    'DB Press Day',
+    'Leg Day',
+  ]);
+  const selected = chooseWorkout(d, 1);
+  expect(selected.carouselWorkout).toBe(workouts[2].key);
+  expect(carouselIndex(chooseWeek(selected, 2))).toBe(3);
+  const next = chooseWorkout(chooseWeek(selected, 2), 0, 1);
+  expect(next.rotationWeek).toBe(1);
+  expect(next.carouselWorkout).toBe(workouts[0].key);
+});
+
+it('manual week selection preserves the implicit initial day when week orders differ', () => {
+  const d = structuredClone(base);
+  d.rotation!.sessions.find((s) => s.week === 1 && s.workout === workouts[2].key)!.day = 'Monday';
+  expect(carouselIndex(d)).toBe(0);
+  const next = chooseWeek(d, 2);
+  expect(next.carouselWorkout).toBe(workouts[2].key);
+  expect(carouselIndex(next)).toBe(3);
 });

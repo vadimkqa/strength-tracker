@@ -26,12 +26,12 @@ import {
   type Data,
   type Workout,
 } from './data';
-import { workouts, templateLabel } from './workouts';
+import { workouts, carouselWorkouts, templateLabel } from './workouts';
 import { WorkoutCarousel, type CarouselHandle } from './WorkoutCarousel';
 import { PlanImporter } from './PlanImporter';
 import type { PlanDraft } from './plan-import';
 import './style.css';
-const cards = workouts;
+
 const label = templateLabel;
 type Tab = 'Train' | 'Progress' | 'PRs' | 'Settings';
 function Icon({ name }: { name: Tab }) {
@@ -81,7 +81,7 @@ function App() {
     [fatal, setFatal] = useState(''),
     [pending, setPending] = useState(0),
     [restoring, setRestoring] = useState(false),
-    [planKey, setPlanKey] = useState<string>(cards[0].key);
+    [planKey, setPlanKey] = useState<string>(workouts[0].key);
   const current = useRef<Data | null>(null),
     queue = useRef(Promise.resolve()),
     importing = useRef(false),
@@ -259,6 +259,7 @@ function App() {
           )
             records.set(e.name, { weight: Number(s.weight), reps: Number(s.reps) });
         }
+  const cards = carouselWorkouts(data.rotation, data.rotationWeek);
   const index = carouselIndex(data);
   const rotationSession = data.rotation?.sessions.find(
     (s) => s.week === (data.rotationWeek || 1) && s.workout === cards[index].key,
@@ -548,13 +549,6 @@ function App() {
                             <p>{ex.notes}</p>
                           </details>
                         )}
-                        <div className="setrow performance-row set-head">
-                          <span>SET</span>
-                          <span className="last-heading">LAST TIME</span>
-                          <span>KG</span>
-                          <span>REPS</span>
-                          <span>DONE</span>
-                        </div>
                         {ex.sets.map((s, j) => (
                           <div
                             className={`setrow performance-row ${s.done ? 'done' : ''} ${s.needsLogging ? 'needs-logging' : ''} ${active.controller?.selected?.setId === s.id || active.controller?.running?.setId === s.id ? 'active-set' : ''}`}
@@ -572,16 +566,6 @@ function App() {
                             >
                               {s.prescription ? (s.prescription.number ?? '?') : j + 1}
                             </button>
-                            <span className="previous-set">
-                              {(() => {
-                                const n = setNumber(s, j);
-                                const last =
-                                  n === null ? undefined : ex.previousPerformance?.sets[n];
-                                return last
-                                  ? `Last: ${last.weight} kg × ${last.reps}`
-                                  : 'No previous performance';
-                              })()}
-                            </span>
                             {(['weight', 'reps'] as const).map((field) => (
                               <input
                                 key={field}
@@ -657,6 +641,8 @@ function App() {
                             </button>
                             <button
                               className="skip-set"
+                              aria-label={`${s.skipped ? 'Include' : 'Skip'} ${ex.name} set ${j + 1}`}
+                              title={s.skipped ? 'Include set' : 'Skip set'}
                               onClick={() =>
                                 activeChange((w) => {
                                   const target = w.exercises[i].sets[j];
@@ -668,14 +654,26 @@ function App() {
                                 })
                               }
                             >
-                              {s.skipped ? 'Include set' : 'Skip set'}
+                              <span aria-hidden="true">{s.skipped ? '↩' : '↷'}</span>
                             </button>
-                            {s.prescription && (
-                              <small className="prescription-per-set">
-                                Set {s.prescription.number ?? '?'}: {repsLabel(s.prescription)} reps
-                                · {s.prescription.effort}
-                              </small>
-                            )}
+                            <div className="set-details">
+                              <span className="previous-set">
+                                {(() => {
+                                  const n = setNumber(s, j);
+                                  const last =
+                                    n === null ? undefined : ex.previousPerformance?.sets[n];
+                                  return last
+                                    ? `Last: ${last.weight} kg × ${last.reps}`
+                                    : 'No previous performance';
+                                })()}
+                              </span>
+                              {s.prescription && (
+                                <small className="prescription-per-set">
+                                  Set {s.prescription.number ?? '?'}: {repsLabel(s.prescription)}{' '}
+                                  reps · {s.prescription.effort}
+                                </small>
+                              )}
+                            </div>
                           </div>
                         ))}
                         <div className="set-adjust compact-set-adjust">

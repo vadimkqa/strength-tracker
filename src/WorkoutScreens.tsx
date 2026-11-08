@@ -60,19 +60,30 @@ export function WorkoutScreens({ workout: w, now, change, finish, children }: Pr
           screen(dx < 0 ? 'timer' : 'exercises');
       }}
     >
-      <div className="workout-screen-tabs" role="tablist" aria-label="Workout screens">
-        {(['exercises', 'timer'] as const).map((s) => (
-          <button
-            key={s}
-            role="tab"
-            id={`workout-tab-${s}`}
-            aria-controls={`workout-panel-${s}`}
-            aria-selected={c.screen === s}
-            onClick={() => screen(s)}
-          >
-            {s.toUpperCase()}
-          </button>
-        ))}
+      <div className="workout-sticky-controls">
+        <div className="workout-screen-tabs" role="tablist" aria-label="Workout screens">
+          {(['exercises', 'timer'] as const).map((s) => (
+            <button
+              key={s}
+              role="tab"
+              id={`workout-tab-${s}`}
+              aria-controls={`workout-panel-${s}`}
+              aria-selected={c.screen === s}
+              onClick={() => screen(s)}
+            >
+              {s.toUpperCase()}
+            </button>
+          ))}
+        </div>
+        {c.screen === 'exercises' && (
+          <div className="setrow performance-row set-head" aria-label="Set logging columns">
+            <span>SET</span>
+            <span>KG</span>
+            <span>REPS</span>
+            <span>DONE</span>
+            <span className="visually-hidden">Skip</span>
+          </div>
+        )}
       </div>
       {pending.length > 0 && (
         <aside className="notice" role="alert">
