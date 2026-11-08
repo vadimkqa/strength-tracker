@@ -1,3 +1,4 @@
+import { useKeyboardViewport } from './useKeyboardViewport';
 import { WorkoutScreens } from './WorkoutScreens';
 import {
   ensureController,
@@ -71,6 +72,7 @@ function Icon({ name }: { name: Tab }) {
   );
 }
 function App() {
+  useKeyboardViewport();
   const [data, setData] = useState<Data | null>(null),
     [tab, setTab] = useState<Tab>('Train'),
     [index, setIndex] = useState(0),
