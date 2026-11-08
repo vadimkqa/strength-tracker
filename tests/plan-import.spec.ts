@@ -215,7 +215,7 @@ test('layered stack shows both neighbors, supports mouse dragging, keyboard and 
   await expect.poll(() => center('Bench Day')).toBeLessThan(3);
   await page.getByRole('region', { name: 'Workout selection', exact: true }).focus();
   await page.keyboard.press('ArrowLeft');
-  await expect.poll(() => center('Leg Day')).toBeLessThan(3);
+  await expect.poll(() => center('Hammer Press Day')).toBeLessThan(3);
   await page.keyboard.press('ArrowRight');
   await expect.poll(() => center('Bench Day')).toBeLessThan(3);
   await page.screenshot({ path: 'test-results/carousel-desktop.png', fullPage: true });

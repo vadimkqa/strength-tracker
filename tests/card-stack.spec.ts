@@ -48,7 +48,7 @@ test('stack keyboard navigation, small screen bounds and reduced motion remain a
   const region = page.getByRole('region', { name: 'Workout selection', exact: true });
   await region.focus();
   await page.keyboard.press('ArrowLeft');
-  await expect(page.locator('.stack-front')).toHaveAttribute('aria-label', 'Leg Day');
+  await expect(page.locator('.stack-front')).toHaveAttribute('aria-label', 'Hammer Press Day');
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('.stack-front')).toHaveAttribute('aria-label', 'Bench Day');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

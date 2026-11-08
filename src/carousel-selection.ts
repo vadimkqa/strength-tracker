@@ -1,9 +1,11 @@
 import type { Data } from './data';
-import { workouts } from './workouts';
+import { carouselWorkouts } from './workouts';
 export function carouselIndex(data: Data) {
   return Math.max(
     0,
-    workouts.findIndex((w) => w.key === data.carouselWorkout),
+    carouselWorkouts(data.rotation, data.rotationWeek).findIndex(
+      (w) => w.key === data.carouselWorkout,
+    ),
   );
 }
 export function chooseWorkout(data: Data, index: number, wrap: -1 | 0 | 1 = 0): Data {
@@ -11,21 +13,32 @@ export function chooseWorkout(data: Data, index: number, wrap: -1 | 0 | 1 = 0): 
   if (index === current && !wrap) return data;
   const weeks = [...new Set(data.rotation?.weeks || [1, 2])].sort((a, b) => a - b);
   const weekIndex = Math.max(0, weeks.indexOf(data.rotationWeek || weeks[0]));
+  const week =
+    data.rotation && wrap
+      ? weeks[(weekIndex + wrap + weeks.length) % weeks.length]
+      : data.rotationWeek;
   return {
     ...data,
-    carouselWorkout: workouts[index].key,
-    ...(data.rotation && wrap
-      ? { rotationWeek: weeks[(weekIndex + wrap + weeks.length) % weeks.length] }
-      : {}),
+    carouselWorkout: carouselWorkouts(data.rotation, week)[index].key,
+    ...(data.rotation && wrap ? { rotationWeek: week } : {}),
     difficultyOverride: undefined,
   };
 }
 export function chooseWeek(data: Data, week: number): Data {
-  return { ...data, rotationWeek: week, difficultyOverride: undefined };
+  return {
+    ...data,
+    carouselWorkout:
+      data.carouselWorkout ||
+      carouselWorkouts(data.rotation, data.rotationWeek)[carouselIndex(data)].key,
+    rotationWeek: week,
+    difficultyOverride: undefined,
+  };
 }
 export function workoutDifficulty(data: Data, index = carouselIndex(data)) {
   const session = data.rotation?.sessions.find(
-    (s) => s.week === (data.rotationWeek || 1) && s.workout === workouts[index].key,
+    (s) =>
+      s.week === (data.rotationWeek || 1) &&
+      s.workout === carouselWorkouts(data.rotation, data.rotationWeek)[index].key,
   );
   return session
     ? data.difficultyOverride?.key === session.key

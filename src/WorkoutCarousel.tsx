@@ -1,5 +1,5 @@
 import { useImperativeHandle, useRef, useState, type Ref, type CSSProperties } from 'react';
-import { workouts, templateKey, type Rotation } from './workouts';
+import { carouselWorkouts, templateKey, type Rotation } from './workouts';
 import type { Plan } from './templates';
 export interface CarouselHandle {
   select: (index: number) => void;
@@ -22,6 +22,7 @@ export function WorkoutCarousel({
   rotation,
   rotationWeek,
 }: Props) {
+  const workouts = carouselWorkouts(rotation, rotationWeek);
   const gesture = useRef<{
     x: number;
     y: number;
@@ -110,7 +111,7 @@ export function WorkoutCarousel({
               ? plan[session.key] || []
               : []
             : plan[templateKey(card.key, week)] || plan[card.key] || [];
-          const day = session?.day || (rotation ? 'Unscheduled' : card.key.split(' · ')[0]);
+          const day = session?.day || (rotation ? 'Unscheduled' : card.day);
           const intensity =
             (index === selected ? (week === 'easy' ? 'easy' : 'hard') : session?.intensity) ||
             (week === 'easy' ? 'easy' : 'hard');
