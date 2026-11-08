@@ -1118,65 +1118,120 @@ p.import-warning {
   min-height: 34px;
   font-size: 19px;
 }
-/* Layered playing cards. Only transforms/opacity animate; vertical page scrolling stays native. */
-.playing-stack-shell {
-  margin-top: 4px;
+/* Portrait playing-card home. Cards share one grid track, so content can grow on short screens. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+main.home-screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: clip;
+  overflow-y: visible;
+  padding-top: calc(8px + env(safe-area-inset-top));
+  padding-bottom: calc(84px + env(safe-area-inset-bottom));
+}
+.home-screen > header {
+  flex: none;
+  margin-bottom: 10px;
+}
+.home-screen .rotation-selection {
+  flex: none;
+  margin: 0 0 12px;
+}
+.home-screen .week-segments {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  gap: 2px;
+  padding: 2px;
+}
+.home-screen .week-segments button {
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.home-screen .week-segments .chosen {
+  background: #45295e;
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px #9856dd70;
+}
+.home-screen .playing-stack-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin: 0 -24px 22px;
+  min-height: 350px;
 }
 .carousel-shell .playing-stack {
-  display: block;
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr;
   position: relative;
-  height: 346px;
+  min-height: 350px;
+  height: auto;
   overflow: visible;
-  touch-action: pan-y;
+  touch-action: pan-y pinch-zoom;
   scroll-snap-type: none;
   cursor: grab;
   isolation: isolate;
-  perspective: 1000px;
 }
 .carousel-shell .playing-stack:before,
 .carousel-shell .playing-stack:after {
   display: none;
 }
 .carousel-shell .stack-card {
-  position: absolute;
-  left: 50%;
-  top: 8px;
-  width: calc(100% - 84px);
+  grid-area: 1/1;
+  justify-self: center;
+  position: relative;
+  left: auto;
+  top: auto;
+  width: 78%;
   margin: 0;
-  transform-origin: 50% 88%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 22px;
+  transform-origin: 50% 85%;
   transition:
     transform 320ms cubic-bezier(0.2, 0.75, 0.25, 1),
     opacity 260ms ease,
     filter 260ms ease;
-  will-change: transform;
-  box-shadow: 0 14px 30px #0008;
+  box-shadow: 0 16px 30px #0008;
   border-color: #49305e;
-  opacity: 1;
 }
 .carousel-shell .stack-front {
   z-index: 3;
-  transform: translateX(calc(-50% + var(--drag-x))) rotate(0deg) scale(1);
+  transform: translateX(var(--drag-x)) rotate(0deg);
+  opacity: 1;
   filter: none;
-  border-color: #8152a8;
+  border-color: #a368d8;
   box-shadow:
     0 16px 34px #0009,
-    0 0 22px #9856dd12;
+    0 0 20px #9856dd18;
 }
 .carousel-shell .stack-previous {
   z-index: 1;
-  transform: translateX(calc(-50% - 43px)) translateY(4px) rotate(-9deg) scale(0.88);
-  filter: brightness(0.55);
-  opacity: 0.88;
+  transform: translateX(-38px) translateY(14px) rotate(-8deg) scale(0.94);
+  filter: brightness(0.65);
+  opacity: 0.9;
 }
 .carousel-shell .stack-next {
   z-index: 2;
-  transform: translateX(calc(-50% + 43px)) translateY(4px) rotate(9deg) scale(0.88);
-  filter: brightness(0.55);
-  opacity: 0.88;
+  transform: translateX(38px) translateY(14px) rotate(8deg) scale(0.94);
+  filter: brightness(0.65);
+  opacity: 0.9;
 }
 .carousel-shell .stack-back {
   z-index: 0;
-  transform: translateX(-50%) translateY(15px) scale(0.8);
+  transform: translateY(20px) scale(0.88);
   opacity: 0;
   pointer-events: none;
 }
@@ -1188,7 +1243,7 @@ p.import-warning {
   z-index: 5;
   background: transparent !important;
   border: 0;
-  border-radius: 20px;
+  border-radius: 22px;
   padding: 0;
 }
 .stack-card-select:focus-visible {
@@ -1197,259 +1252,155 @@ p.import-warning {
 }
 .stack-card-top {
   display: flex;
+  flex: none;
   justify-content: space-between;
-  padding: 13px 16px;
+  gap: 8px;
+  padding: 11px 14px;
   font-size: 9px;
-  letter-spacing: 1.2px;
+  letter-spacing: 1px;
   text-transform: uppercase;
   color: #c6b5d5;
   background: var(--card);
 }
-.playing-stack .photo {
-  height: 166px !important;
+.home-screen .playing-stack .photo {
+  flex: 1;
+  height: auto !important;
+  min-height: 110px;
 }
-.playing-stack .card-caption {
-  padding: 17px 16px 14px !important;
+.playing-stack .photo img {
+  position: absolute;
+  inset: 0;
 }
-.playing-stack .card-caption h2 {
-  font-size: 26px;
-  margin-bottom: 14px !important;
+.home-screen .playing-stack .card-caption {
+  flex: none;
+  padding: 14px 15px 8px !important;
 }
-.playing-stack .card-caption .eyebrow {
-  font-size: 7px;
-  letter-spacing: 1.1px;
+.home-screen .playing-stack .card-caption h2 {
+  font-size: clamp(24px, 6vw, 30px);
+  line-height: 1.1;
+  margin: 0 0 10px !important;
+  overflow-wrap: anywhere;
+}
+.home-screen .playing-stack .card-caption .eyebrow {
+  font-size: 8px;
+  line-height: 1.4;
+  letter-spacing: 1px;
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+.home-screen .playing-stack .card-footer {
+  padding-top: 9px;
+  font-size: 10px;
+  line-height: 1.4;
 }
 .stack-intensity {
   position: absolute;
   right: 12px;
   bottom: 12px;
   border: 1px solid #a873d45c;
-  border-radius: 7px;
-  padding: 6px 9px;
+  border-radius: 8px;
+  padding: 7px 10px;
   background: #18121fe8;
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 1px;
   color: #e0c0ff;
 }
 .stack-peek-label {
   display: none;
   position: absolute;
-  top: 80px;
+  top: 36%;
   z-index: 4;
   writing-mode: vertical-rl;
   letter-spacing: 1px;
-  font-size: 10px;
-  color: #e8d7f7;
+  font-size: 11px;
+  color: #efdefb;
 }
 .stack-previous .stack-peek-label {
   display: block;
-  left: 7px;
+  left: 32px;
   transform: rotate(180deg);
 }
 .stack-next .stack-peek-label {
   display: block;
-  right: 7px;
+  right: 32px;
 }
-.stack-navigation {
-  margin-top: 6px;
-  gap: 15px;
+.home-card-controls {
+  flex: none;
+  position: relative;
+  z-index: 6;
+  padding: 0 14px 6px;
+  cursor: default;
 }
-.stack-navigation button {
-  min-height: 34px;
-  min-width: 34px;
-  padding: 3px 10px;
+.home-screen .home-card-controls .intensity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 0;
 }
-.stack-navigation span {
+.home-screen .home-card-controls .intensity > .eyebrow {
   font-size: 8px;
-  letter-spacing: 1px;
+  line-height: 1.5;
+  letter-spacing: 0.5px;
 }
-@media (max-width: 360px) {
-  .carousel-shell .stack-card {
-    width: calc(100% - 74px);
-  }
-  .playing-stack .photo {
-    height: 145px !important;
-  }
-  .carousel-shell .playing-stack {
-    height: 326px;
-  }
-  .playing-stack .card-caption h2 {
-    font-size: 23px;
-  }
+.home-card-controls .segmented {
+  padding: 2px;
+  border-radius: 10px;
 }
-@media (prefers-reduced-motion: reduce) {
-  .carousel-shell .stack-card {
-    transition: none;
-  }
+.home-card-controls .segmented button {
+  min-height: 44px;
+  min-width: 62px;
+  padding: 6px 10px;
+  font-size: 10px;
 }
-main.home-screen {
-  overflow: clip;
+.home-screen .home-card-controls .pagination {
+  position: relative;
+  z-index: 6;
+  gap: 0;
+  flex-wrap: wrap;
+  margin: 0;
+}
+.home-card-controls .pagination button {
+  width: 34px;
+  min-height: 40px;
+}
+.home-card-controls .pagination button:after {
+  top: 17px;
+  left: 14px;
+}
+.home-card-controls .pagination button.selected:after {
+  width: 20px;
+  left: 7px;
+}
+.home-screen .start {
+  flex: none;
+  min-height: 52px;
+  margin: 0;
+  scroll-margin-bottom: calc(100px + env(safe-area-inset-bottom));
+}
+.home-screen .save-status {
+  flex: none;
+  margin: 8px 0 0;
+  font-size: 9px;
+  line-height: 12px;
 }
 .playing-stack:focus-visible {
   outline: 1px solid var(--highlight);
   outline-offset: -2px;
   border-radius: 22px;
 }
-/* Keep the stack and its controls close together on phone-sized home screens. */
-@media (max-width: 699px) {
-  main.home-screen {
-    padding-top: calc(16px + env(safe-area-inset-top));
-  }
-  .home-screen header {
-    margin-bottom: 16px;
-  }
-  .home-screen .page-title {
-    margin-bottom: 14px;
-  }
-  .home-screen .page-title h1 {
-    font-size: 28px;
-    line-height: 1.15;
-    margin-bottom: 8px;
-  }
-  .home-screen .page-title h1 br {
-    display: none;
-  }
-  .home-screen .page-title .eyebrow {
-    font-size: 8px;
-    margin-bottom: 7px;
-  }
-  .home-screen .page-title > p:last-child {
-    font-size: 12px;
-  }
-  .home-screen .section-title {
-    margin-top: 14px;
-    margin-bottom: 10px;
-  }
-  .home-screen .rotation-selection {
-    margin-bottom: 12px;
-  }
-  .home-screen .rotation-selection label {
-    margin-top: 10px;
-    margin-bottom: 6px;
-  }
-  .home-screen .rotation-selection select {
-    min-height: 38px;
-    padding: 8px 10px;
-  }
-  .home-screen .rotation-selection p {
-    margin: 4px 0;
-    font-size: 11px;
-  }
-  .home-screen .pagination {
-    margin: 5px 0;
-  }
-  .home-screen .intensity {
-    margin: 12px 0;
-  }
-  .home-screen .footnote {
-    margin-top: 12px;
-  }
-}
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-/* Compact phone home: reserve the fixed navigation, including its safe-area padding. */
 @media (max-width: 699px) {
   html {
     scroll-padding-bottom: calc(100px + env(safe-area-inset-bottom));
-  }
-  main.home-screen {
-    min-height: 100vh;
-    min-height: 100dvh;
-    overflow-x: clip;
-    overflow-y: visible;
-    padding-top: calc(8px + env(safe-area-inset-top));
-    padding-bottom: calc(100px + env(safe-area-inset-bottom));
-  }
-  .home-screen .page-title,
-  .home-screen .section-title,
-  .home-screen .footnote {
-    display: none;
-  }
-  .home-screen header {
-    margin-bottom: 8px;
   }
   .home-screen .brand-mark {
     width: 40px;
     height: 40px;
   }
-  .home-screen .rotation-selection {
-    margin: 0 0 8px;
-  }
-  .home-screen .rotation-selection label {
-    font-size: 8px;
-    margin: 0 0 5px;
-    letter-spacing: 1px;
-  }
-  .home-screen .rotation-selection select {
-    min-height: 36px;
-    padding: 7px 10px;
-    font-size: 13px;
-  }
-  .home-screen .rotation-selection p {
-    font-size: 10px;
-    line-height: 1.4;
-    margin: 4px 0;
-  }
-  .home-screen .playing-stack-shell {
-    margin-top: 0;
-  }
-  .home-screen .carousel-shell .playing-stack {
-    height: 276px;
-    height: min(276px, 44dvh);
-  }
-  .home-screen .playing-stack .stack-card-top {
-    padding: 10px 13px;
-    font-size: 8px;
-  }
-  .home-screen .playing-stack .photo {
-    height: 126px !important;
-    height: clamp(100px, 20dvh, 126px) !important;
-  }
-  .home-screen .playing-stack .card-caption {
-    padding: 12px 14px !important;
-  }
-  .home-screen .playing-stack .card-caption h2 {
-    font-size: 24px;
-    margin-bottom: 10px !important;
-  }
-  .home-screen .playing-stack .card-footer {
-    padding-top: 10px;
-    font-size: 8px;
-  }
-  .home-screen .playing-stack .card-caption .eyebrow {
-    margin-bottom: 7px;
-  }
-  .home-screen .pagination {
-    position: relative;
-    z-index: 4;
-    margin: 8px 0 3px;
-  }
-  .home-screen .intensity {
-    margin: 8px 0 10px;
-  }
-  .home-screen .start {
-    min-height: 50px;
-    scroll-margin-bottom: calc(100px + env(safe-area-inset-bottom));
-  }
-  .home-screen .save-status {
-    margin: 10px 0 0;
-    font-size: 9px;
-  }
 }
-@media (max-width: 699px) and (max-height: 680px) {
-  .home-screen .carousel-shell .playing-stack {
-    height: 260px;
-    height: min(260px, 44dvh);
-  }
-  .home-screen .playing-stack .photo {
-    height: 116px !important;
-    height: clamp(90px, 19dvh, 116px) !important;
+@media (prefers-reduced-motion: reduce) {
+  .carousel-shell .stack-card {
+    transition: none;
   }
 }
 main.active-workout {
@@ -2189,4 +2140,9 @@ html[data-workout-keyboard='true'] .exercise-collapse {
 .exercise-card-footer:has(details[open]) {
   flex-direction: column;
   align-items: stretch;
+}
+
+/* Reserve navigation space without changing keyboard handling on any other screen. */
+main.home-screen {
+  padding-bottom: calc(84px + env(safe-area-inset-bottom));
 }

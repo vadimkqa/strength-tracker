@@ -31,7 +31,7 @@ test('layered mobile cards show rotation metadata, side taps select the front wo
   await expect(front).toHaveAttribute('aria-label', 'DB Press Day');
   await expect(front.locator('.stack-intensity')).toHaveText('EASY');
   await expect(front.locator('.stack-card-top')).toContainText('Thursday');
-  await page.getByLabel('TRAINING ROTATION', { exact: true }).selectOption('2');
+  await page.getByRole('button', { name: 'Week 2', exact: true }).click();
   await expect(front.locator('.stack-intensity')).toHaveText('HEAVY');
   await page.getByRole('button', { name: 'START WORKOUT' }).click();
   await expect(

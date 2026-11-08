@@ -54,7 +54,7 @@ The original app is retained in `legacy/` for upgrade tests and reference; it is
 
 ## Centered workout carousel and TXT plan importing
 
-The Train carousel centers one large card with both neighbors peeking in. It keeps four positions (Bench, DB Press, Leg, Hammer Press) and supports native touch swipes, mouse drag, side-card taps, keyboard left/right arrows, and four pagination dots. EASY/HARD and START WORKOUT stay underneath it.
+The Train carousel centers one large card with both neighbors peeking in. It keeps four positions (Bench, DB Press, Leg, Hammer Press) and supports native touch swipes, mouse drag, side-card taps, keyboard left/right arrows, and four pagination dots. EASY/HARD and pagination sit inside the active card; START WORKOUT remains immediately above bottom navigation.
 
 To review a TXT program:
 
@@ -79,7 +79,7 @@ A block such as `(1:6 no fail; 2:4 no fail; 3:3-6 fail; 4:3-6 fail)` attaches to
 
 Two source ambiguities are intentionally reported: Week 1 Bench pull-ups contains `half fail fail`, and Week 2 DB Press shrugs lists set numbers `1, 3, 4` (missing `2`). Neither is corrected or hidden automatically. A user can edit the prescription or explicitly keep its original wording/numbering. No rest durations are present in GYM.txt, and none are inferred.
 
-After a confirmed rotation import, Train retains the same four cards and the Week 1 / Week 2 dropdown. Cards sort by the selected week's imported weekday metadata: Tuesday Bench, Thursday DB Press, Friday Legs, Saturday Hammer Press in GYM.txt. Swiping forward from Saturday Hammer Press to Tuesday Bench advances to the next week; swiping backward from Bench to Hammer Press goes to the previous week. Both weeks wrap in either direction. Tapping a neighboring card or using the arrow keys follows the same rule. Selecting a pagination dot keeps the current week. Manually changing the week keeps the selected workout day. Each card uses that week's source session, including **Friday legs**. EASY/HARD starts at the selected session's default and allows a manual session-level override without switching weeks, templates or individual exercise prescriptions. Changing the day or week resets the override to the new session's default. The selected day, week and override persist on the device. Earlier templates remain stored, while the imported rotation determines new session selection. Already active sessions continue unchanged. The rotation and prescriptions survive reload and JSON backup restore.
+After a confirmed rotation import, Train retains the same four cards and the Week 1 / Week 2 segmented switch. Cards sort by the selected week's imported weekday metadata: Tuesday Bench, Thursday DB Press, Friday Legs, Saturday Hammer Press in GYM.txt. Swiping forward from Saturday Hammer Press to Tuesday Bench advances to the next week; swiping backward from Bench to Hammer Press goes to the previous week. Both weeks wrap in either direction. Tapping a neighboring card or using the arrow keys follows the same rule. Selecting a pagination dot keeps the current week. Manually changing the week keeps the selected workout day. Each card uses that week's source session, including **Friday legs**. EASY/HARD starts at the selected session's default and allows a manual session-level override without switching weeks, templates or individual exercise prescriptions. Changing the day or week resets the override to the new session's default. The selected day, week and override persist on the device. Earlier templates remain stored, while the imported rotation determines new session selection. Already active sessions continue unchanged. The rotation and prescriptions survive reload and JSON backup restore.
 
 The earlier generic formats (`4 x 6–8`, `3 sets of 12 reps`, `rest 1:30`, aliases, and explicit compound/isolation defaults) remain supported. An illustrative generic example is in `examples/training-plan-format.txt`; it is never applied automatically.
 
@@ -99,9 +99,9 @@ The references and edited values persist with the active workout in IndexedDB, i
 
 ## Layered Train selector
 
-Train uses a playing-card stack: one centered active card, rotated/dimmed previous and next cards, and a hidden fourth card. Only transforms and opacity animate. Touch swipes and mouse drags select the next/previous workout; tapping an exposed side card brings it forward. Arrow buttons, keyboard arrows and pagination provide equivalent accessible controls. Reduced-motion preferences disable transitions, and vertical touch scrolling stays native.
+Train uses a playing-card stack: one centered active card, rotated/dimmed previous and next cards, with additional cards hidden behind them. Card transforms, dimming and opacity animate. Touch swipes and mouse drags select the next/previous workout; tapping an exposed side card brings it forward. Keyboard arrows and pagination provide equivalent accessible controls; visible carousel arrows are omitted. Reduced-motion preferences disable transitions, and vertical touch scrolling stays native.
 
-Cards show the existing imported session's day, rotation week, intensity, photo and exercise/core/optional counts. Week selection, Hard/Easy variant routing and Start Workout use the same saved templates as before. Pagination sits below the stack; no training data or storage schema changes are made by this redesign.
+Cards show the existing imported session's day, rotation week, intensity, photo and exercise/core/optional counts. Week selection, Hard/Easy variant routing and Start Workout use the same saved templates as before. Pagination sits inside the active card; no training data or storage schema changes are made by this redesign.
 
 ## GitHub Pages and iPhone installation
 
@@ -109,11 +109,13 @@ Production assets and the PWA are scoped to `/strength-tracker/`. The GitHub Act
 
 See [GitHub Pages deployment and iPhone setup](docs/GITHUB_PAGES.md) for enabling Pages, deploying, installing through Safari, and safely transferring your existing JSON backup. A new host/device cannot automatically access your Mac's browser storage; no storage keys or training logic are changed by deployment.
 
-## Compact iPhone Train home
+## Portrait iPhone Train home
 
-On phones, Train hides the motivational intro, keeps a compact logo/rotation header and reduces the layered card stack by approximately 20%. Visible carousel arrows/counter are removed; swipe, side-card taps, keyboard selection and pagination remain available. Dots sit directly beneath the cards, followed by intensity and Start Workout.
+Train keeps the approved branding and uses a portrait card at 78% of the available screen width, with full-size tilted/dimmed neighbors and readable vertical edge names. A flex/grid layout gives the photograph the remaining vertical space instead of fixing the card to a short image rail. The active card contains metadata, EASY/HARD and dynamic pagination; controls are excluded from drag and arrow-key carousel handling. The segmented week control displays only supplied multi-week rotations and calls the existing week-selection handler.
 
-Home spacing uses dynamic viewport units and safe-area padding. The page reserves space for the fixed bottom navigation and remains vertically scrollable on short viewports. `tests/mobile-home-layout.spec.ts` checks initial Start-button bounds and hit testing at 375×667, 390×844 and 393×852, plus scroll recovery at 320×480 with extra bottom padding. Playwright starts the production preview automatically if it is not already running; build before running browser tests. Phone-sized Chromium tests are not a physical Safari/device test.
+Start Workout stays below the stack, above the safe-area-padded fixed navigation, with save status underneath. The layout grows naturally for long titles, many indicators or short viewports and permits normal vertical scrolling. No workout selection, template, storage, timer, branding or keyboard logic is changed. Mobile regressions cover 375×667, 390×844, 393×852 and 430×932, including portrait proportions, neighboring card geometry, embedded controls, both week boundaries, all eight GYM sessions, reload/offline behavior, and native vertical scrolling on a shorter screen.
+
+Home spacing uses dynamic viewport units and safe-area padding. The page reserves space for the fixed bottom navigation and remains vertically scrollable on short viewports. `tests/mobile-home-layout.spec.ts` checks initial Start-button bounds and hit testing at 375×667, 390×844, 393×852 and 430×932, plus scroll recovery at 320×480 with extra bottom padding. Playwright starts the production preview automatically if it is not already running; build before running browser tests. Phone-sized Chromium tests are not a physical Safari/device test.
 
 ## Active workout controller: Exercises and Timer
 
@@ -190,7 +192,7 @@ CSV/XLSX and DOCX tables recognize an **Exercise** column plus **Workout** (or a
 
 ### Carousel and compatibility
 
-The home deck uses the imported number of workout templates for the selected week, including weeks with different counts. Weekday metadata controls chronological ordering; unscheduled programs retain source order. Swiping across an end advances/reverses the supplied rotation and updates the week dropdown. One- and two-card decks avoid duplicated side cards and accidental week changes on a front-card tap. The selected template ID determines what Start Workout loads.
+The home deck uses the imported number of workout templates for the selected week, including weeks with different counts. Weekday metadata controls chronological ordering; unscheduled programs retain source order. Swiping across an end advances/reverses the supplied rotation and updates the week segmented switch. One- and two-card decks avoid duplicated side cards and accidental week changes on a front-card tap. The selected template ID determines what Start Workout loads.
 
 The established GYM.txt parser remains a compatibility adapter: its two weeks, eight templates, Friday legs, exact set numbering and exercise-level intensities are preserved, and confirmed imports also gain a normalized program representation. Classic Hard/Easy variants remain accessible. Existing JSON backups and legacy IndexedDB/localStorage data remain readable; versioned program backups are structurally validated before restore.
 

@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
   }, data);
   await page.goto('/strength-tracker/');
 });
-test('four positions wrap weeks both ways and manual dropdown retains the selected day', async ({
+test('four positions wrap weeks both ways and manual week switch retains the selected day', async ({
   page,
   context,
 }) => {
@@ -42,26 +42,26 @@ test('four positions wrap weeks both ways and manual dropdown retains the select
   await page.getByRole('button', { name: 'Select Hammer Press Day', exact: true }).click();
   await swipe(true);
   await expect(front).toHaveAttribute('aria-label', 'Bench Day');
-  await expect(week).toHaveValue('2');
+  await expect(week).toHaveAttribute('data-week', '2');
   await swipe(false);
   await expect(front).toHaveAttribute('aria-label', 'Hammer Press Day');
-  await expect(week).toHaveValue('1');
-  await week.selectOption('2');
+  await expect(week).toHaveAttribute('data-week', '1');
+  await week.getByRole('button', { name: 'Week 2', exact: true }).click();
   await expect(front).toHaveAttribute('aria-label', 'Hammer Press Day');
   await swipe(true);
   await expect(front).toHaveAttribute('aria-label', 'Bench Day');
-  await expect(week).toHaveValue('1');
+  await expect(week).toHaveAttribute('data-week', '1');
   await swipe(false);
   await expect(front).toHaveAttribute('aria-label', 'Hammer Press Day');
-  await expect(week).toHaveValue('2');
+  await expect(week).toHaveAttribute('data-week', '2');
   await page.getByRole('button', { name: 'Select DB Press Day', exact: true }).click();
-  await week.selectOption('1');
+  await week.getByRole('button', { name: 'Week 1', exact: true }).click();
   await expect(front).toHaveAttribute('aria-label', 'DB Press Day');
   await expect(page.getByRole('button', { name: 'EASY', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
-  await week.selectOption('2');
+  await week.getByRole('button', { name: 'Week 2', exact: true }).click();
   await expect(front).toHaveAttribute('aria-label', 'DB Press Day');
   await expect(page.getByRole('button', { name: 'HARD', exact: true })).toHaveAttribute(
     'aria-pressed',
@@ -69,15 +69,25 @@ test('four positions wrap weeks both ways and manual dropdown retains the select
   );
   await expect(page.locator('.save-status')).toHaveText('Saved on this device');
   await page.reload();
-  await expect(week).toHaveValue('2');
+  await expect(week).toHaveAttribute('data-week', '2');
   await expect(front).toHaveAttribute('aria-label', 'DB Press Day');
 });
 test('manual intensity override preserves selected week and exact imported template', async ({
   page,
 }) => {
   await page.getByRole('button', { name: 'EASY', exact: true }).click();
-  await expect(page.getByLabel('TRAINING ROTATION', { exact: true })).toHaveValue('1');
+  await expect(page.getByLabel('TRAINING ROTATION', { exact: true })).toHaveAttribute(
+    'data-week',
+    '1',
+  );
   await expect(page.locator('.stack-front .stack-intensity')).toHaveText('EASY');
+  await page.getByRole('button', { name: 'Week 1', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'EASY', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.locator('.stack-front .stack-intensity')).toHaveText('EASY');
+
   await page.getByRole('button', { name: 'START WORKOUT' }).click();
   await expect(
     page.getByRole('heading', { name: 'Week 1 · Tuesday · Bench Day · Hard', exact: true }),
@@ -101,10 +111,10 @@ test('side-card taps change the week exactly once at either boundary', async ({ 
   }
   await tapSide('.stack-next');
   await expect(front).toHaveAttribute('aria-label', 'Bench Day');
-  await expect(week).toHaveValue('2');
+  await expect(week).toHaveAttribute('data-week', '2');
   await tapSide('.stack-previous');
   await expect(front).toHaveAttribute('aria-label', 'Hammer Press Day');
-  await expect(week).toHaveValue('1');
+  await expect(week).toHaveAttribute('data-week', '1');
 });
 
 test('chronological cards start all eight exact source templates and wrap after Saturday', async ({
@@ -123,7 +133,10 @@ test('chronological cards start all eight exact source templates and wrap after 
     for (let i = 0; i < 4; i++) {
       const front = page.locator('.stack-front');
       await expect(front).toHaveAttribute('aria-label', days[i]);
-      await expect(page.getByLabel('TRAINING ROTATION', { exact: true })).toHaveValue(String(week));
+      await expect(page.getByLabel('TRAINING ROTATION', { exact: true })).toHaveAttribute(
+        'data-week',
+        String(week),
+      );
       await expect(front.locator('.stack-card-top')).toContainText(weekdays[i]);
       const session = data.rotation!.sessions.find(
         (s) => s.week === week && s.day === weekdays[i],
@@ -168,6 +181,9 @@ test('chronological cards start all eight exact source templates and wrap after 
     }
   }
   await expect(page.locator('.stack-front')).toHaveAttribute('aria-label', 'Bench Day');
-  await expect(page.getByLabel('TRAINING ROTATION', { exact: true })).toHaveValue('1');
+  await expect(page.getByLabel('TRAINING ROTATION', { exact: true })).toHaveAttribute(
+    'data-week',
+    '1',
+  );
   await page.screenshot({ path: 'test-results/weekday-carousel.png', fullPage: true });
 });
