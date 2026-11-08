@@ -161,14 +161,17 @@ test('PWA assets and all photos are cached, offline reload and workout logging w
   await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
   await page.reload();
   await page.waitForFunction(() => !!navigator.serviceWorker.controller);
-  const manifest = await page.request.get('/manifest.webmanifest');
+  const manifest = await page.request.get('/strength-tracker/manifest.webmanifest');
   expect((await manifest.json()).display).toBe('standalone');
   await context.setOffline(true);
   await page.reload();
   await expect(page.getByRole('button', { name: 'START WORKOUT' })).toBeVisible();
   for (const photo of ['bench', 'pullups', 'hammer', 'legs']) {
     expect(
-      await page.evaluate(async (photo) => (await fetch(`/photos/${photo}.jpg`)).ok, photo),
+      await page.evaluate(
+        async (photo) => (await fetch(`/strength-tracker/photos/${photo}.jpg`)).ok,
+        photo,
+      ),
     ).toBe(true);
   }
   await page.getByRole('button', { name: 'START WORKOUT' }).click();

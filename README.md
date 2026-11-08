@@ -102,3 +102,9 @@ The references and edited values persist with the active workout in IndexedDB, i
 Train uses a playing-card stack: one centered active card, rotated/dimmed previous and next cards, and a hidden fourth card. Only transforms and opacity animate. Touch swipes and mouse drags select the next/previous workout; tapping an exposed side card brings it forward. Arrow buttons, keyboard arrows and pagination provide equivalent accessible controls. Reduced-motion preferences disable transitions, and vertical touch scrolling stays native.
 
 Cards show the existing imported session's day, rotation week, intensity, photo and exercise/core/optional counts. Week selection, Hard/Easy variant routing and Start Workout use the same saved templates as before. Pagination sits below the stack; no training data or storage schema changes are made by this redesign.
+
+## GitHub Pages and iPhone installation
+
+Production assets and the PWA are scoped to `/strength-tracker/`. The GitHub Actions workflow in `.github/workflows/deploy-pages.yml` checks pull requests and publishes `dist/` after a push to `main`.
+
+See [GitHub Pages deployment and iPhone setup](docs/GITHUB_PAGES.md) for enabling Pages, deploying, installing through Safari, and safely transferring your existing JSON backup. A new host/device cannot automatically access your Mac's browser storage; no storage keys or training logic are changed by deployment.
