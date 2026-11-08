@@ -1,3 +1,4 @@
+import { ensureController, finishController, type WorkoutController } from './controller';
 import { preparePerformance, type PerformanceReference } from './performance';
 import type { SetPrescription } from './prescriptions';
 import type { Rotation } from './workouts';
@@ -6,12 +7,17 @@ import { templateKey } from './workouts';
 import { defaultPlan, type Plan } from './templates';
 export const LEGACY_KEY = 'strength-tracker-v1';
 export interface SetEntry {
+  id?: string;
+  skipped?: boolean;
+  needsLogging?: boolean;
+  timing?: { started: number; ended: number; durationMs: number };
   weight: string;
   reps: string;
   done: boolean;
   prescription?: SetPrescription;
 }
 export interface Exercise {
+  skipped?: boolean;
   exerciseKey?: string;
   previousPerformance?: PerformanceReference;
   id: string;
@@ -26,6 +32,7 @@ export interface Exercise {
   sets: SetEntry[];
 }
 export interface Workout {
+  controller?: WorkoutController;
   id: string;
   name: string;
   week: string;
@@ -203,43 +210,45 @@ export function createWorkout(
 ): Workout {
   const keys = Object.keys(defaultPlan());
   const key = templateKey(name, week);
-  return preparePerformance(
-    {
-      id: crypto.randomUUID(),
-      name,
-      week,
-      started: now,
-      restEnd: null,
-      restSeconds: null,
-      exercises: (
-        plan[key] ||
-        plan[name] ||
-        defaultPlan()[key] ||
-        defaultPlan()[name] ||
-        defaultPlan()[keys[0]]
-      ).map(([name, count, rest, prescription]) => ({
+  return ensureController(
+    preparePerformance(
+      {
         id: crypto.randomUUID(),
         name,
-        rest,
-        ...(prescription
-          ? {
-              targetReps: prescription.reps,
-              notes: prescription.notes,
-              exerciseIntensity: prescription.exerciseIntensity,
-              optional: prescription.optional,
-              alternatives: prescription.alternatives,
-              kind: prescription.kind,
-            }
-          : {}),
-        sets: Array.from({ length: count ?? 0 }, (_, i) => ({
-          ...newSet(),
-          ...(prescription?.setPrescriptions?.[i]
-            ? { prescription: structuredClone(prescription.setPrescriptions[i]) }
+        week,
+        started: now,
+        restEnd: null,
+        restSeconds: null,
+        exercises: (
+          plan[key] ||
+          plan[name] ||
+          defaultPlan()[key] ||
+          defaultPlan()[name] ||
+          defaultPlan()[keys[0]]
+        ).map(([name, count, rest, prescription]) => ({
+          id: crypto.randomUUID(),
+          name,
+          rest,
+          ...(prescription
+            ? {
+                targetReps: prescription.reps,
+                notes: prescription.notes,
+                exerciseIntensity: prescription.exerciseIntensity,
+                optional: prescription.optional,
+                alternatives: prescription.alternatives,
+                kind: prescription.kind,
+              }
             : {}),
+          sets: Array.from({ length: count ?? 0 }, (_, i) => ({
+            ...newSet(),
+            ...(prescription?.setPrescriptions?.[i]
+              ? { prescription: structuredClone(prescription.setPrescriptions[i]) }
+              : {}),
+          })),
         })),
-      })),
-    },
-    history,
+      },
+      history,
+    ),
   );
 }
 export function completeSet(workout: Workout, i: number, j: number, now = Date.now()): Workout {
@@ -262,7 +271,17 @@ export function completeSet(workout: Workout, i: number, j: number, now = Date.n
 }
 export function finishWorkout(data: Data, now = Date.now()): Data {
   if (!data.active) return data;
-  return { ...data, history: [{ ...data.active, finished: now }, ...data.history], active: null };
+  return {
+    ...data,
+    history: [
+      {
+        ...(data.active.controller ? finishController(data.active, now) : data.active),
+        finished: now,
+      },
+      ...data.history,
+    ],
+    active: null,
+  };
 }
 export const formatTime = (seconds: number) => {
   const s = Math.max(0, Math.floor(seconds));

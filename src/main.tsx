@@ -1,3 +1,13 @@
+import { WorkoutScreens } from './WorkoutScreens';
+import {
+  ensureController,
+  reconcile,
+  finalizeLogging,
+  selectSet,
+  skipSet,
+  positions,
+  pendingLogs,
+} from './controller';
 import { exerciseIdentity, addPerformanceSet, setNumber } from './performance';
 import { repsLabel } from './prescriptions';
 import { saveImportedPlan } from './plan-storage';
@@ -8,7 +18,6 @@ import {
   saveData,
   restoreBackup,
   createWorkout,
-  completeSet,
   finishWorkout,
   newSet,
   formatTime,
@@ -81,6 +90,10 @@ function App() {
     const initialize = async () => {
       try {
         const d = await loadData();
+        if (d.active && !d.active.controller) {
+          d.active = ensureController(d.active);
+          await saveData(d);
+        }
         if (alive) {
           current.current = d;
           setData(d);
@@ -141,7 +154,17 @@ function App() {
     }
   }
   function activeChange(fn: (w: Workout) => Workout) {
-    change((d) => ({ ...d, active: d.active ? fn(d.active) : null }));
+    change((d) => ({
+      ...d,
+      active: d.active
+        ? (() => {
+            const w = ensureController(fn(ensureController(d.active)));
+            finalizeLogging(w);
+            reconcile(w);
+            return w;
+          })()
+        : null,
+    }));
   }
   function exportData() {
     if (!current.current) return;
@@ -167,6 +190,10 @@ function App() {
       setRestoring(true);
       await queue.current;
       const next = await restoreBackup(current.current!, obj);
+      if (next.active && !next.active.controller) {
+        next.active = ensureController(next.active);
+        await saveData(next);
+      }
       current.current = next;
       setData(next);
       setError('');
@@ -240,7 +267,10 @@ function App() {
     : data.week;
   return (
     <>
-      <main inert={restoring} className={tab === 'Train' && !active ? 'home-screen' : undefined}>
+      <main
+        inert={restoring}
+        className={tab === 'Train' ? (active ? 'active-workout' : 'home-screen') : undefined}
+      >
         <header>
           <div className="brand">
             <span className="brand-mark">
@@ -390,260 +420,326 @@ function App() {
                   </div>
                   <span className="live-dot">●</span>
                 </div>
-                <section className="card session-metrics">
-                  <div>
-                    <span className="eyebrow">DURATION</span>
-                    <strong className="time">{formatTime((now - active.started) / 1000)}</strong>
-                  </div>
-                  <div>
-                    <span className="eyebrow">COMPLETED</span>
-                    <strong>
-                      {active.exercises.reduce(
-                        (n, e) => n + e.sets.filter((s) => s.done).length,
-                        0,
-                      )}
-                      <small>
-                        {' '}
-                        / {active.exercises.reduce((n, e) => n + e.sets.length, 0)} sets
-                      </small>
-                    </strong>
-                  </div>
-                </section>
-                <section className="card">
-                  <div className="row">
-                    <div>
-                      <p className="eyebrow">REST TIMER</p>
-                      <strong className="time purple" aria-label="Rest countdown">
-                        {formatTime(active.restEnd ? Math.ceil((active.restEnd - now) / 1000) : 0)}
-                      </strong>
-                      <p className="muted">
-                        {active.restEnd
-                          ? active.restEnd > now
-                            ? 'Resting'
-                            : 'Rest complete'
-                          : active.exercises.some(
-                                (e) => e.rest === null && e.sets.some((s) => s.done),
-                              )
-                            ? 'Rest unspecified — choose a timer if needed'
-                            : 'Starts after a set'}
-                      </p>
-                    </div>
-                    <button onClick={() => activeChange((w) => ({ ...w, restEnd: null }))}>
-                      Skip
-                    </button>
-                  </div>
-                  <div className="rest-controls">
-                    {[60, 120, 180, 240].map((t) => (
-                      <button
-                        key={t}
-                        onClick={() =>
-                          activeChange((w) => ({
-                            ...w,
-                            restEnd: Date.now() + t * 1000,
-                            restSeconds: t,
-                          }))
-                        }
-                      >
-                        {t / 60} min
-                      </button>
-                    ))}
-                  </div>
-                </section>
-                <div className="section-title">
-                  <h2>Exercises</h2>
-                  <button
-                    onClick={() => {
-                      const name = prompt('New exercise name');
-                      if (name?.trim())
-                        activeChange((w) => ({
-                          ...w,
-                          exercises: [
-                            ...w.exercises,
-                            {
-                              id: crypto.randomUUID(),
-                              name: name.trim(),
-                              rest: data.restDefault,
-                              sets: [newSet(), newSet(), newSet()],
-                            },
-                          ],
-                        }));
-                    }}
-                  >
-                    + Add
-                  </button>
-                </div>
-                {active.exercises.map((ex, i) => {
-                  return (
-                    <section className="card exercise" key={ex.id || i}>
-                      <div className="row">
-                        <div>
-                          <h3>{ex.name}</h3>
-                          <p className="muted">
-                            {ex.rest === null ? 'Rest unspecified' : `${ex.rest}s rest`}
-                          </p>
-                        </div>
-                        <button
-                          aria-label={`Edit ${ex.name}`}
-                          onClick={() => {
-                            const name = prompt('Exercise name', ex.name);
-                            if (name === null) return;
-                            const rest = prompt(
-                              'Rest between sets (seconds)',
-                              ex.rest === null ? '' : String(ex.rest),
-                            );
-                            activeChange((w) => {
-                              w.exercises[i].name = name.trim() || ex.name;
-                              if (
-                                exerciseIdentity(w.exercises[i].name) !== exerciseIdentity(ex.name)
-                              ) {
-                                w.exercises[i].exerciseKey = exerciseIdentity(w.exercises[i].name);
-                                delete w.exercises[i].previousPerformance;
-                              }
-                              if (rest && Number.isFinite(Number(rest)) && Number(rest) > 0)
-                                w.exercises[i].rest = Math.min(3600, Math.round(Number(rest)));
-                              return w;
-                            });
-                          }}
-                        >
-                          Edit
-                        </button>
-                      </div>
-                      {(ex.exerciseIntensity || ex.optional) && (
-                        <p className="eyebrow">
-                          {ex.exerciseIntensity}
-                          {ex.optional ? ' · OPTIONAL' : ''}
-                        </p>
-                      )}
-                      {ex.alternatives?.length ? (
-                        <p className="muted">Alternatives: {ex.alternatives.join(' OR ')}</p>
-                      ) : null}
-                      {ex.sets.length === 0 && (
-                        <p className="muted">
-                          Set count unspecified. Add sets only as you choose to perform them.
-                        </p>
-                      )}
-                      {ex.targetReps && (
-                        <p className="muted prescription">Target: {ex.targetReps} reps</p>
-                      )}
-                      {ex.notes && (
-                        <details className="prescription-notes">
-                          <summary>Plan notes</summary>
-                          <p>{ex.notes}</p>
-                        </details>
-                      )}
-                      <div className="setrow performance-row set-head">
-                        <span>SET</span>
-                        <span className="last-heading">LAST TIME</span>
-                        <span>KG</span>
-                        <span>REPS</span>
-                        <span>DONE</span>
-                      </div>
-                      {ex.sets.map((s, j) => (
-                        <div className={`setrow performance-row ${s.done ? 'done' : ''}`} key={j}>
-                          <span>
-                            {s.prescription
-                              ? (s.prescription.number ?? '?')
-                              : String(j + 1).padStart(2, '0')}
-                          </span>
-                          <span className="previous-set">
-                            {(() => {
-                              const n = setNumber(s, j);
-                              const last = n === null ? undefined : ex.previousPerformance?.sets[n];
-                              return last
-                                ? `Last: ${last.weight} kg × ${last.reps}`
-                                : 'No previous performance';
-                            })()}
-                          </span>
-                          {(['weight', 'reps'] as const).map((field) => (
-                            <input
-                              key={field}
-                              aria-label={`${field === 'weight' ? 'Weight' : 'Reps'} ${ex.name} set ${j + 1}`}
-                              type="number"
-                              inputMode={field === 'weight' ? 'decimal' : 'numeric'}
-                              min="0"
-                              step={field === 'weight' ? '0.5' : '1'}
-                              value={s[field]}
-                              onChange={(e) =>
-                                activeChange((w) => {
-                                  w.exercises[i].sets[j][field] = e.target.value;
-                                  return w;
-                                })
-                              }
-                            />
-                          ))}
-                          <button
-                            className={s.done ? 'check done' : 'check'}
-                            aria-label={`${s.done ? 'Undo' : 'Complete'} ${ex.name} set ${j + 1}`}
-                            aria-pressed={s.done}
-                            onClick={() => activeChange((w) => completeSet(w, i, j))}
-                          >
-                            {s.done ? '✓' : '○'}
-                          </button>
-                          {s.prescription && (
-                            <small className="prescription-per-set">
-                              Set {s.prescription.number ?? '?'}: {repsLabel(s.prescription)} reps ·{' '}
-                              {s.prescription.effort}
-                            </small>
-                          )}
-                        </div>
-                      ))}
-                      <div className="set-adjust compact-set-adjust">
-                        <div>
-                          <button
-                            aria-label={`Remove set from ${ex.name}`}
-                            disabled={ex.sets.length <= 1}
-                            onClick={() => {
-                              if (
-                                ex.sets.at(-1)?.done &&
-                                !confirm('Remove the last completed set?')
-                              )
-                                return;
-                              activeChange((w) => {
-                                w.exercises[i].sets.pop();
-                                return w;
-                              });
-                            }}
-                          >
-                            −
-                          </button>
-                          <button
-                            aria-label={`Add set to ${ex.name}`}
-                            disabled={ex.sets.length >= 12}
-                            onClick={() =>
-                              activeChange((w) => {
-                                const exercise = w.exercises[i];
-                                addPerformanceSet(exercise);
-                                return w;
-                              })
-                            }
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-                    </section>
-                  );
-                })}
-                <button
-                  className="primary full"
-                  onClick={() => {
+                <WorkoutScreens
+                  workout={active}
+                  now={now}
+                  change={activeChange}
+                  finish={() => {
                     if (confirm('Finish and save this workout?')) {
                       change((d) => finishWorkout(d));
                       setTab('Progress');
                     }
                   }}
                 >
-                  Finish & save workout
-                </button>
-                <button
-                  className="danger full"
-                  onClick={() => {
-                    if (confirm('Discard this active workout? Saved history will be kept.'))
-                      change((d) => ({ ...d, active: null }));
-                  }}
-                >
-                  Discard workout
-                </button>
+                  <p className="workout-duration muted">
+                    Workout duration: {formatTime((now - active.started) / 1000)}
+                  </p>
+                  <div className="section-title">
+                    <h2>Exercises</h2>
+                    <button
+                      onClick={() => {
+                        const name = prompt('New exercise name');
+                        if (name?.trim())
+                          activeChange((w) => ({
+                            ...w,
+                            exercises: [
+                              ...w.exercises,
+                              {
+                                id: crypto.randomUUID(),
+                                name: name.trim(),
+                                rest: data.restDefault,
+                                sets: [newSet(), newSet(), newSet()],
+                              },
+                            ],
+                          }));
+                      }}
+                    >
+                      + Add
+                    </button>
+                  </div>
+                  {active.exercises.map((ex, i) => {
+                    return (
+                      <section
+                        className={`card exercise ${active.controller?.selected?.exerciseId === ex.id ? 'active-exercise' : ''}`}
+                        key={ex.id || i}
+                      >
+                        <div className="row">
+                          <div>
+                            <h3>{ex.name}</h3>
+                            <button
+                              className="small"
+                              onClick={() =>
+                                activeChange((w) => {
+                                  const e = w.exercises[i];
+                                  const target =
+                                    e.sets.find((s) => !s.done && !s.skipped && !s.needsLogging) ||
+                                    e.sets[0];
+                                  if (target) selectSet(w, { exerciseId: e.id, setId: target.id! });
+                                  return w;
+                                })
+                              }
+                            >
+                              Select exercise
+                            </button>
+                            <button
+                              className="small"
+                              onClick={() =>
+                                activeChange((w) => {
+                                  const e = w.exercises[i];
+                                  if (w.controller?.running?.exerciseId === e.id)
+                                    throw Error('Stop the active set first.');
+                                  e.skipped = !e.skipped;
+                                  for (const s of e.sets)
+                                    if (!s.done) {
+                                      s.skipped = e.skipped;
+                                      s.needsLogging = false;
+                                    }
+                                  w.controller!.selected = positions(w)[0] || null;
+                                  if (!e.skipped && e.sets.length)
+                                    w.controller!.selected = {
+                                      exerciseId: e.id,
+                                      setId: (e.sets.find((s) => !s.done)?.id || e.sets[0]?.id)!,
+                                    };
+                                  reconcile(w);
+                                  return w;
+                                })
+                              }
+                            >
+                              {ex.skipped ? 'Include exercise' : 'Skip exercise'}
+                            </button>
+                            <p className="muted">
+                              {ex.rest === null ? 'Rest unspecified' : `${ex.rest}s rest`}
+                            </p>
+                          </div>
+                          <button
+                            aria-label={`Edit ${ex.name}`}
+                            onClick={() => {
+                              const name = prompt('Exercise name', ex.name);
+                              if (name === null) return;
+                              const rest = prompt(
+                                'Rest between sets (seconds)',
+                                ex.rest === null ? '' : String(ex.rest),
+                              );
+                              activeChange((w) => {
+                                w.exercises[i].name = name.trim() || ex.name;
+                                if (
+                                  exerciseIdentity(w.exercises[i].name) !==
+                                  exerciseIdentity(ex.name)
+                                ) {
+                                  w.exercises[i].exerciseKey = exerciseIdentity(
+                                    w.exercises[i].name,
+                                  );
+                                  delete w.exercises[i].previousPerformance;
+                                }
+                                if (rest && Number.isFinite(Number(rest)) && Number(rest) > 0)
+                                  w.exercises[i].rest = Math.min(3600, Math.round(Number(rest)));
+                                return w;
+                              });
+                            }}
+                          >
+                            Edit
+                          </button>
+                        </div>
+                        {(ex.exerciseIntensity || ex.optional) && (
+                          <p className="eyebrow">
+                            {ex.exerciseIntensity}
+                            {ex.optional ? ' · OPTIONAL' : ''}
+                          </p>
+                        )}
+                        {ex.alternatives?.length ? (
+                          <p className="muted">Alternatives: {ex.alternatives.join(' OR ')}</p>
+                        ) : null}
+                        {ex.sets.length === 0 && (
+                          <p className="muted">
+                            Set count unspecified. Add sets only as you choose to perform them.
+                          </p>
+                        )}
+                        {ex.targetReps && (
+                          <p className="muted prescription">Target: {ex.targetReps} reps</p>
+                        )}
+                        {ex.notes && (
+                          <details className="prescription-notes">
+                            <summary>Plan notes</summary>
+                            <p>{ex.notes}</p>
+                          </details>
+                        )}
+                        <div className="setrow performance-row set-head">
+                          <span>SET</span>
+                          <span className="last-heading">LAST TIME</span>
+                          <span>KG</span>
+                          <span>REPS</span>
+                          <span>DONE</span>
+                        </div>
+                        {ex.sets.map((s, j) => (
+                          <div
+                            className={`setrow performance-row ${s.done ? 'done' : ''} ${s.needsLogging ? 'needs-logging' : ''} ${active.controller?.selected?.setId === s.id || active.controller?.running?.setId === s.id ? 'active-set' : ''}`}
+                            key={j}
+                          >
+                            <button
+                              className="select-set"
+                              aria-label={`Select ${ex.name} set ${j + 1}`}
+                              onClick={() =>
+                                activeChange((w) => {
+                                  selectSet(w, { exerciseId: ex.id, setId: s.id! });
+                                  return w;
+                                })
+                              }
+                            >
+                              {s.prescription ? (s.prescription.number ?? '?') : j + 1}
+                            </button>
+                            <span className="previous-set">
+                              {(() => {
+                                const n = setNumber(s, j);
+                                const last =
+                                  n === null ? undefined : ex.previousPerformance?.sets[n];
+                                return last
+                                  ? `Last: ${last.weight} kg × ${last.reps}`
+                                  : 'No previous performance';
+                              })()}
+                            </span>
+                            {(['weight', 'reps'] as const).map((field) => (
+                              <input
+                                key={field}
+                                aria-label={`${field === 'weight' ? 'Weight' : 'Reps'} ${ex.name} set ${j + 1}`}
+                                type="number"
+                                inputMode={field === 'weight' ? 'decimal' : 'numeric'}
+                                min="0"
+                                step={field === 'weight' ? '0.5' : '1'}
+                                value={s[field]}
+                                onChange={(e) =>
+                                  activeChange((w) => {
+                                    w.exercises[i].sets[j][field] = e.target.value;
+                                    return w;
+                                  })
+                                }
+                              />
+                            ))}
+                            <button
+                              className={s.done ? 'check done' : 'check'}
+                              aria-label={`${s.done ? 'Undo' : 'Complete'} ${ex.name} set ${j + 1}`}
+                              aria-pressed={s.done}
+                              onClick={() =>
+                                activeChange((w) => {
+                                  const s = w.exercises[i].sets[j];
+                                  if (w.controller?.running?.setId === s.id)
+                                    throw Error('Use STOP SET to preserve timing.');
+                                  if (
+                                    !s.done &&
+                                    (!s.reps ||
+                                      Number(s.reps) <= 0 ||
+                                      !Number.isInteger(Number(s.reps)))
+                                  )
+                                    throw Error(
+                                      'Enter valid weight and positive whole-number reps first.',
+                                    );
+                                  s.done = !s.done;
+                                  s.needsLogging = false;
+                                  if (w.controller!.selected?.setId === s.id && s.done)
+                                    w.controller!.selected = positions(w)[0] || null;
+                                  if (!s.done)
+                                    w.controller!.selected = {
+                                      exerciseId: w.exercises[i].id,
+                                      setId: s.id!,
+                                    };
+                                  return w;
+                                })
+                              }
+                            >
+                              {s.done ? '✓' : '○'}
+                            </button>
+                            <button
+                              className="skip-set"
+                              onClick={() =>
+                                activeChange((w) => {
+                                  const target = w.exercises[i].sets[j];
+                                  if (target.skipped) {
+                                    target.skipped = false;
+                                    selectSet(w, { exerciseId: ex.id, setId: target.id! });
+                                  } else skipSet(w, { exerciseId: ex.id, setId: target.id! });
+                                  return w;
+                                })
+                              }
+                            >
+                              {s.skipped ? 'Include set' : 'Skip set'}
+                            </button>
+                            {s.prescription && (
+                              <small className="prescription-per-set">
+                                Set {s.prescription.number ?? '?'}: {repsLabel(s.prescription)} reps
+                                · {s.prescription.effort}
+                              </small>
+                            )}
+                          </div>
+                        ))}
+                        <div className="set-adjust compact-set-adjust">
+                          <div>
+                            <button
+                              aria-label={`Remove set from ${ex.name}`}
+                              disabled={ex.sets.length <= 1}
+                              onClick={() => {
+                                if (
+                                  ex.sets.at(-1)?.done &&
+                                  !confirm('Remove the last completed set?')
+                                )
+                                  return;
+                                activeChange((w) => {
+                                  if (
+                                    w.controller?.running?.setId === w.exercises[i].sets.at(-1)?.id
+                                  )
+                                    throw Error('Stop the active set before removing it.');
+                                  w.exercises[i].sets.pop();
+                                  return w;
+                                });
+                              }}
+                            >
+                              −
+                            </button>
+                            <button
+                              aria-label={`Add set to ${ex.name}`}
+                              disabled={ex.sets.length >= 12}
+                              onClick={() =>
+                                activeChange((w) => {
+                                  const exercise = w.exercises[i];
+                                  addPerformanceSet(exercise);
+                                  const added = exercise.sets.at(-1)!;
+                                  added.id = crypto.randomUUID();
+                                  if (!w.controller!.selected)
+                                    w.controller!.selected = {
+                                      exerciseId: exercise.id,
+                                      setId: added.id,
+                                    };
+                                  return w;
+                                })
+                              }
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      </section>
+                    );
+                  })}
+                  <button
+                    className="primary full"
+                    disabled={active.controller?.phase === 'set' || pendingLogs(active).length > 0}
+                    onClick={() => {
+                      if (confirm('Finish and save this workout?')) {
+                        change((d) => finishWorkout(d));
+                        setTab('Progress');
+                      }
+                    }}
+                  >
+                    Finish & save workout
+                  </button>
+                  <button
+                    className="danger full"
+                    onClick={() => {
+                      if (confirm('Discard this active workout? Saved history will be kept.'))
+                        change((d) => ({ ...d, active: null }));
+                    }}
+                  >
+                    Discard workout
+                  </button>
+                </WorkoutScreens>
               </>
             )}
           </>
