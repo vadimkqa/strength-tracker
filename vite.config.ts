@@ -8,9 +8,9 @@ export default defineConfig({
       injectRegister: null,
       filename: 'sw.js',
       scope: '/strength-tracker/',
-      includeAssets: ['photos/*', 'icon-*.png'],
+      includeAssets: ['photos/*', 'icon-*.png', 'apple-touch-icon*.png', 'favicon*.png'],
       manifest: {
-        name: 'Strength Tracker',
+        name: 'Strength Trainer 2.0',
         short_name: 'Strength',
         description: 'Your training. Your progress.',
         theme_color: '#0B0810',
@@ -20,8 +20,14 @@ export default defineConfig({
         start_url: '/strength-tracker/',
         scope: '/strength-tracker/',
         icons: [
-          { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
+          { src: 'icon-st-v2-192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'icon-st-v2-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          {
+            src: 'icon-st-v2-maskable-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
         ],
       },
       workbox: {
