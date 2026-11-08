@@ -1,3 +1,4 @@
+import { TimerBubble } from './TimerBubble';
 import { useRef, type ReactNode } from 'react';
 import type { Workout } from './data';
 import { findSet, pendingLogs, startSet, stopSet, stopwatch } from './controller';
@@ -128,6 +129,18 @@ export function WorkoutScreens({ workout: w, now, change, finish, children }: Pr
           </div>
         )}
       </section>
+      {c.screen === 'exercises' && (
+        <TimerBubble
+          controller={c}
+          now={now}
+          save={(position) =>
+            change((w) => {
+              w.controller!.bubblePosition = position;
+              return w;
+            })
+          }
+        />
+      )}
       <div className="workout-floating-action">
         <button
           className="primary"

@@ -1596,3 +1596,74 @@ main.active-workout {
     animation: none;
   }
 }
+.check.in-progress {
+  border-color: var(--highlight);
+  background: #332042;
+  color: var(--highlight);
+}
+.set-spinner {
+  display: inline-block;
+  width: 19px;
+  height: 19px;
+  border: 2px solid #b67aff40;
+  border-top-color: var(--highlight);
+  border-radius: 50%;
+  animation: active-set-spin 0.85s linear infinite;
+  vertical-align: middle;
+}
+@keyframes active-set-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.timer-bubble-safe {
+  position: fixed;
+  visibility: hidden;
+  pointer-events: none;
+  padding-top: env(safe-area-inset-top);
+  width: 0;
+  height: 0;
+}
+.timer-bubble {
+  position: fixed;
+  z-index: 7;
+  width: 76px;
+  height: 76px;
+  min-height: 76px;
+  padding: 9px 5px;
+  border-radius: 50%;
+  border: 1px solid #9862c6;
+  background: #1b1226;
+  box-shadow: 0 5px 16px #0007;
+  color: var(--highlight);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+  font-variant-numeric: tabular-nums;
+}
+.timer-bubble:active {
+  cursor: grabbing;
+}
+.bubble-phase {
+  font-size: 9px;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+}
+.bubble-elapsed {
+  font-size: 17px;
+  letter-spacing: -0.4px;
+  line-height: 1.1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .set-spinner {
+    animation: none;
+    border-top-color: var(--highlight);
+    border-right-color: var(--highlight);
+  }
+}

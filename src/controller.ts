@@ -4,6 +4,7 @@ export interface Position {
   setId: string;
 }
 export interface WorkoutController {
+  bubblePosition?: { x: number; y: number };
   phase: 'warmup' | 'set' | 'rest';
   phaseStarted: number;
   selected: Position | null;

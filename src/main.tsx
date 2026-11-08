@@ -615,7 +615,19 @@ function App() {
                               />
                             ))}
                             <button
-                              className={s.done ? 'check done' : 'check'}
+                              className={
+                                active.controller?.phase === 'set' &&
+                                active.controller.running?.setId === s.id
+                                  ? 'check in-progress'
+                                  : s.done
+                                    ? 'check done'
+                                    : 'check'
+                              }
+                              aria-busy={
+                                (active.controller?.phase === 'set' &&
+                                  active.controller.running?.setId === s.id) ||
+                                undefined
+                              }
                               aria-label={`${s.done ? 'Undo' : 'Complete'} ${ex.name} set ${j + 1}`}
                               aria-pressed={s.done}
                               onClick={() =>
@@ -645,7 +657,18 @@ function App() {
                                 })
                               }
                             >
-                              {s.done ? '✓' : '○'}
+                              {active.controller?.phase === 'set' &&
+                              active.controller.running?.setId === s.id ? (
+                                <span
+                                  className="set-spinner"
+                                  role="status"
+                                  aria-label="Set in progress"
+                                />
+                              ) : s.done ? (
+                                '✓'
+                              ) : (
+                                '○'
+                              )}
                             </button>
                             <button
                               className="skip-set"
