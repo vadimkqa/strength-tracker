@@ -1667,3 +1667,49 @@ main.active-workout {
     border-right-color: var(--highlight);
   }
 }
+/* Safari focuses controls smaller than 16px by zooming the page. Keep readable native controls. */
+@media (max-width: 699px), (hover: none) and (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+    max-width: 100%;
+  }
+}
+input,
+select,
+textarea,
+a[href],
+summary,
+[role='button'],
+[role='tab'] {
+  touch-action: manipulation;
+}
+.workout-controller,
+.carousel-shell .playing-stack {
+  touch-action: pan-y pinch-zoom;
+}
+/* Only the local drag handle needs exclusive touch handling. */
+.timer-bubble {
+  touch-action: none;
+}
+nav[aria-label='Main navigation'] {
+  bottom: var(--keyboard-offset, 0px);
+}
+.workout-floating-action {
+  bottom: calc(88px + env(safe-area-inset-bottom) + var(--keyboard-offset, 0px));
+}
+main.active-workout {
+  padding-bottom: calc(190px + env(safe-area-inset-bottom) + var(--keyboard-offset, 0px));
+}
+main:not(.active-workout) {
+  padding-bottom: calc(100px + env(safe-area-inset-bottom) + var(--keyboard-offset, 0px));
+}
+@supports (-webkit-touch-callout: none) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+    max-width: 100%;
+  }
+}

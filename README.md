@@ -136,3 +136,11 @@ The currently running set's DONE control displays an animated purple spinner. Br
 EXERCISES also shows a draggable circular timer with the current Warm-up / Set / Rest phase and its elapsed time, using the same persisted phase timestamp as TIMER. The bubble is absent on TIMER and returns on EXERCISES. Dragging uses pointer capture and does not trigger screen swiping; keyboard arrow keys provide an accessible move alternative. Its viewport-relative position is saved only when a drag ends (or an arrow key moves it), and survives screen changes and reload for that active workout. Position is clamped to the visible viewport and above the floating action; viewport/keyboard changes recompute bounds without changing workout timing.
 
 Mobile browser tests verify spinner uniqueness/checkmark transition, live phase timing, drag/swipe isolation, fixed position while scrolling, screen changes, reload and resize bounds. Screenshots are generated at `test-results/active-set-spinner-and-bubble.png` and `test-results/floating-timer-bubble-mobile.png`.
+
+### iPhone focus and keyboard viewport
+
+Mobile/touch and iOS form controls use at least 16px computed font size to prevent Safari's small-input focus zoom. Standard controls use `touch-action: manipulation`; workout/card swipe regions explicitly allow vertical pan and pinch zoom. Only the draggable timer handle uses `touch-action: none`. The viewport meta keeps normal user scaling enabled, with no maximum-scale or user-scalable restriction.
+
+A focused form control's visual viewport updates the fixed navigation/action offset and the scroll reserve when the keyboard reduces usable height. The bubble recomputes its bounds after that update. Pinch zoom is intentionally excluded from keyboard-offset compensation. No workout or stored data changes are made by this fix.
+
+`tests/iphone-focus.spec.ts` verifies all form font sizes, weight/reps focus geometry, scale/width and overflow at 375×667, 390×844 and 393×852, plus simulated keyboard viewport offsets and pinch-scale exclusion. These are Chromium mobile tests; native Safari auto-zoom and physical keyboard behavior still require an on-device check.

@@ -44,10 +44,12 @@ export function TimerBubble({ controller, now, save }: Props) {
     };
     measure();
     window.addEventListener('resize', measure);
+    window.addEventListener('workout-viewport-change', measure);
     window.visualViewport?.addEventListener('resize', measure);
     window.visualViewport?.addEventListener('scroll', measure);
     return () => {
       window.removeEventListener('resize', measure);
+      window.removeEventListener('workout-viewport-change', measure);
       window.visualViewport?.removeEventListener('resize', measure);
       window.visualViewport?.removeEventListener('scroll', measure);
     };
