@@ -1,3 +1,5 @@
+import { BackupPanel } from './BackupPanel';
+import { BACKUP_FILENAME, restoreDatabaseBackup } from './backup';
 import { resizeTemplateSets } from './importing/saving';
 import type { TrainingProgram } from './importing/model';
 import { carouselIndex, chooseWorkout, chooseWeek, workoutDifficulty } from './carousel-selection';
@@ -20,7 +22,6 @@ import { createRoot } from 'react-dom/client';
 import {
   loadData,
   saveData,
-  restoreBackup,
   createWorkout,
   finishWorkout,
   newSet,
@@ -177,32 +178,20 @@ function App() {
     );
     const a = document.createElement('a');
     a.href = url;
-    a.download = `strength-tracker-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = BACKUP_FILENAME;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 3000);
   }
-  async function importData(file: File) {
+  async function importData(source: unknown) {
+    if (!current.current || importing.current) throw Error('Wait for the current save to finish.');
+    importing.current = true;
+    setRestoring(true);
     try {
-      const obj = JSON.parse(await file.text());
-      if (
-        !confirm(
-          'Restore this backup’s plan and preferences and merge its history? All current workouts will be kept.',
-        )
-      )
-        return;
-      importing.current = true;
-      setRestoring(true);
       await queue.current;
-      const next = await restoreBackup(current.current!, obj);
-      if (next.active && !next.active.controller) {
-        next.active = ensureController(next.active);
-        await saveData(next);
-      }
+      const next = await restoreDatabaseBackup(current.current!, source, true);
       current.current = next;
       setData(next);
       setError('');
-    } catch (e) {
-      setError('Backup not imported: ' + (e as Error).message);
     } finally {
       importing.current = false;
       setRestoring(false);
@@ -933,6 +922,7 @@ function App() {
               <h1>Settings.</h1>
               <p>A plan that moves with you.</p>
             </div>
+            <BackupPanel data={data} ready={!pending && !restoring} onRestore={importData} />
             <PlanImporter onApply={applyPlan} />
             <section className="card">
               <h2>Workout plan</h2>
@@ -1018,30 +1008,6 @@ function App() {
                     </option>
                   ))}
               </select>
-            </section>
-            <section className="card">
-              <h2>Your data belongs to you.</h2>
-              <p className="muted">
-                Saved on this device in IndexedDB. Export regularly. Restoring a backup merges
-                history and keeps your current sessions. Your original v1 localStorage data is left
-                untouched.
-              </p>
-              <button className="primary full" onClick={exportData}>
-                Export JSON backup ↓
-              </button>
-              <label className="file-label" htmlFor="backup">
-                Restore & merge backup ↑
-              </label>
-              <input
-                id="backup"
-                type="file"
-                accept="application/json,.json"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void importData(file);
-                  e.target.value = '';
-                }}
-              />
             </section>
             <p className="footnote">STRENGTH TRAINER 2.0 · LOCAL FIRST</p>
           </>

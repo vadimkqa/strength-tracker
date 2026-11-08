@@ -175,6 +175,9 @@ test('legacy backup active workout resumes and newly added exercise sets can be 
         }),
       ),
     });
+  await page.getByLabel('I confirm restoring this backup’s plans and settings and merging its history.', {exact:true}).check();
+  await page.getByRole('button',{name:'Confirm Restore Data',exact:true}).click();
+  await expect(page.getByRole('status').filter({hasText:'Data restored.'})).toBeVisible();
   await page.getByRole('button', { name: 'Train', exact: true }).click();
   await expect(page.getByLabel('Weight Legacy press set 1', { exact: true })).toHaveValue('70');
   await expect(page.getByRole('button', { name: 'START SET', exact: true })).toBeVisible();

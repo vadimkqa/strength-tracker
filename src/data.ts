@@ -209,6 +209,7 @@ export function mergeBackup(current: Data, incoming: Data): Data {
   }
   return {
     ...current,
+    ...incoming,
     active,
     history: history.sort((a, b) => b.started - a.started),
     plan: { ...current.plan, ...incoming.plan },

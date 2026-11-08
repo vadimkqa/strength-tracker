@@ -1836,3 +1836,33 @@ main.active-workout {
 .pagination {
   flex-wrap: wrap;
 }
+.backup-panel .backup-instructions {
+  margin-top: 12px;
+}
+.backup-contents {
+  margin: 14px 0;
+}
+.backup-review {
+  border-top: 1px solid #42314f;
+  margin-top: 18px;
+  padding-top: 16px;
+  overflow-wrap: anywhere;
+}
+.backup-review > p {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.backup-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.backup-summary dt {
+  color: var(--muted);
+}
+.backup-summary dd {
+  margin: 0;
+  text-align: right;
+}
