@@ -18,6 +18,7 @@ export interface SetEntry {
   prescription?: SetPrescription;
 }
 export interface Exercise {
+  imageUrl?: string;
   groupLabel?: string;
   skipped?: boolean;
   exerciseKey?: string;

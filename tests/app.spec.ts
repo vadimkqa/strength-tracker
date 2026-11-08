@@ -88,6 +88,7 @@ test('legacy history migrates, workout persists, timer and logging, history and 
   await page.getByRole('button', { name: 'Train', exact: true }).click();
   await page.getByRole('button', { name: 'START WORKOUT' }).click();
   await page.getByRole('spinbutton', { name: 'Reps Bench Press set 1', exact: true }).fill('0');
+  await page.getByLabel('Set options for Bench Press',{exact:true}).click();
   await page.getByRole('button', { name: 'Complete Bench Press set 1', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('positive whole-number reps');
   await page.getByRole('spinbutton', { name: 'Weight Bench Press set 1', exact: true }).fill('60');
@@ -187,6 +188,8 @@ test('PWA assets and all photos are cached, offline reload and workout logging w
   }
   await page.getByRole('button', { name: 'START WORKOUT' }).click();
   await page.getByRole('spinbutton', { name: 'Reps Bench Press set 1', exact: true }).fill('10');
+  await page.getByLabel('Weight Bench Press set 1',{exact:true}).fill('0');
+  await page.getByLabel('Set options for Bench Press',{exact:true}).click();
   await page.getByRole('button', { name: 'Complete Bench Press set 1', exact: true }).click();
   await expect(page.getByRole('button', { name: 'START SET', exact: true })).toBeVisible();
 });
@@ -205,6 +208,8 @@ test('exercise editing/addition, screen navigation, undo, discard and explicit h
   await page.getByRole('button', { name: '+ Add', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Cable Crunch', exact: true })).toBeVisible();
   await page.getByRole('spinbutton', { name: 'Reps Custom Press set 1', exact: true }).fill('12');
+  await page.getByLabel('Weight Custom Press set 1',{exact:true}).fill('0');
+  await page.getByLabel('Set options for Custom Press',{exact:true}).click();
   await page.getByRole('button', { name: 'Complete Custom Press set 1', exact: true }).click();
   await page.getByRole('button', { name: 'Undo Custom Press set 1', exact: true }).click();
   await expect(

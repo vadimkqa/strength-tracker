@@ -131,7 +131,7 @@ The controller, selected/running position, panel, weights/reps, completion flags
 
 ### Active-set spinner and floating Exercises timer
 
-The currently running set's DONE control displays an animated purple spinner. Browsing/selecting another row does not move the spinner away from the running set. STOP SET removes the spinner; valid logging becomes a checkmark, while missing data retains the existing pending-logging behavior. Reduced-motion preferences use a static progress arc.
+The currently running set's row action displays an animated purple spinner. Browsing/selecting another row does not move the spinner away from the running set. STOP SET removes the spinner; valid logging becomes a checkmark, while missing data retains the existing pending-logging behavior. Reduced-motion preferences use a static progress arc.
 
 EXERCISES also shows a draggable circular timer with the current Warm-up / Set / Rest phase and its elapsed time, using the same persisted phase timestamp as TIMER. The bubble is absent on TIMER and returns on EXERCISES. Dragging uses pointer capture and does not trigger screen swiping; keyboard arrow keys provide an accessible move alternative. Its viewport-relative position is saved only when a drag ends (or an arrow key moves it), and survives screen changes and reload for that active workout. Position is clamped to the visible viewport and above the floating action; viewport/keyboard changes recompute bounds without changing workout timing.
 
@@ -147,7 +147,11 @@ A focused form control's visual viewport updates the fixed navigation/action off
 
 ### Compact active workout logging
 
-Exercises uses a single sticky column header beneath the Exercises/Timer tabs, shared across the entire exercise list. Input rows keep 44px touch targets and 16px numeric text, with previous performance and set targets on a compact detail line underneath. The row-level skip icon has an exercise/set-specific accessible name. Active highlighting, the spinner, draggable live timer, keyboard positioning and horizontal screen navigation remain available. Mobile regressions cover long scrolling through imported exercises at 375×667, 390×844 and 393×852.
+Exercises uses individually collapsible cards. Each expanded card has its own non-sticky SET / REPS / WEIGHT (KG) / ACTION labels, sharing the exact grid with its rows. Inputs and actions retain 44px touch targets and 16px numeric text. Previous performance, targets, effort and rest prescriptions remain directly under each row; notes and set options are expandable. Play selects a pending set; only the shared Start/Stop controller starts its timing. Completed sets show purple checks, while skipped sets remain distinct.
+
+An exercise receives a green check and collapses only when all its sets have valid completed logs, with no running set or unresolved logging. Skipped sets do not qualify. The next active exercise opens automatically. Manual expansion choices, including reopened completed exercises, persist in the active session by exercise ID. Set edits and row keys also use stable IDs. Completing missing logging while typing defers collapse until focus leaves the exercise. No historical records or plan templates are changed.
+
+The numeric-keyboard layout uses visual viewport measurements only to avoid occlusion, never to resize the table. While the keyboard is open, bottom navigation is temporarily hidden and the smaller shared controller docks above the keyboard; it returns on dismissal. The draggable bubble moves away from the focused field without replacing its saved position. Focus correction scrolls only enough to reveal an obscured input. Pinch zoom remains available. Mobile Chromium regressions cover all three sizes (375×667, 390×844 and 393×852), simulated keyboard resize/offset, scrolling, header swipes, bubble dragging and persisted sessions. A physical iPhone Safari/PWA check is still needed for the native keyboard and OS lock/resume behavior.
 
 ## Universal, local training-plan importing
 

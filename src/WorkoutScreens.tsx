@@ -13,6 +13,7 @@ export function WorkoutScreens({ workout: w, now, change, finish, children }: Pr
   const c = w.controller!;
   const origin = useRef<{ x: number; y: number } | null>(null);
   const busy = useRef(0);
+  const swallowClick = useRef(false);
   const screen = (value: 'exercises' | 'timer') =>
     change((w) => {
       w.controller!.screen = value;
@@ -38,11 +39,19 @@ export function WorkoutScreens({ workout: w, now, change, finish, children }: Pr
   return (
     <div
       className="workout-controller"
+      onClickCapture={(event) => {
+        if (swallowClick.current) {
+          event.preventDefault();
+          event.stopPropagation();
+          swallowClick.current = false;
+        }
+      }}
       onPointerDown={(e) => {
         if (
           (e.target as HTMLElement).closest(
             'input,textarea,select,button,a,summary,[contenteditable=true]',
-          )
+          ) &&
+          !(e.target as HTMLElement).closest('.exercise-toggle,.exercise-chevron')
         ) {
           origin.current = null;
           return;
@@ -56,11 +65,16 @@ export function WorkoutScreens({ workout: w, now, change, finish, children }: Pr
         if (!p) return;
         const dx = e.clientX - p.x,
           dy = e.clientY - p.y;
-        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.4)
+        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+          swallowClick.current = true;
+          setTimeout(() => {
+            swallowClick.current = false;
+          }, 0);
           screen(dx < 0 ? 'timer' : 'exercises');
+        }
       }}
     >
-      <div className="workout-sticky-controls">
+      <div className="workout-navigation">
         <div className="workout-screen-tabs" role="tablist" aria-label="Workout screens">
           {(['exercises', 'timer'] as const).map((s) => (
             <button
@@ -75,15 +89,6 @@ export function WorkoutScreens({ workout: w, now, change, finish, children }: Pr
             </button>
           ))}
         </div>
-        {c.screen === 'exercises' && (
-          <div className="setrow performance-row set-head" aria-label="Set logging columns">
-            <span>SET</span>
-            <span>KG</span>
-            <span>REPS</span>
-            <span>DONE</span>
-            <span className="visually-hidden">Skip</span>
-          </div>
-        )}
       </div>
       {pending.length > 0 && (
         <aside className="notice" role="alert">
@@ -91,7 +96,13 @@ export function WorkoutScreens({ workout: w, now, change, finish, children }: Pr
           {pending.length === 1 ? '' : 's'} to complete logging.
           <button
             onClick={() => {
-              screen('exercises');
+              change((w) => {
+                w.controller!.screen = 'exercises';
+                for (const e of w.exercises)
+                  if (e.sets.some((s) => s.needsLogging))
+                    w.controller!.exerciseCards = { ...w.controller!.exerciseCards, [e.id]: true };
+                return w;
+              });
               requestAnimationFrame(() =>
                 document.querySelector('.needs-logging')?.scrollIntoView({ block: 'center' }),
               );

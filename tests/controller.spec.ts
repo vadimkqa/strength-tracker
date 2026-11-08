@@ -132,6 +132,7 @@ test('swipes switch screens, inputs do not swipe, skipped sets progress, floatin
     'aria-selected',
     'true',
   );
+  await page.getByLabel('Set options for First',{exact:true}).click();
   await page.getByRole('button', { name: /^Skip .* set / }).first().click();
   await ready(page);
   expect((await state(page)).active.exercises[0].sets[0].skipped).toBe(true);

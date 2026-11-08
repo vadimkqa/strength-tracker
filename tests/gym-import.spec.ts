@@ -81,6 +81,7 @@ test('confirmed rotation keeps history and an active session; all eight sessions
   await page.getByRole('button', { name: 'START WORKOUT' }).click();
   await page.getByRole('spinbutton', { name: 'Weight Bench Press set 1', exact: true }).fill('100');
   await page.getByRole('spinbutton', { name: 'Reps Bench Press set 1', exact: true }).fill('5');
+  await page.getByLabel('Set options for Bench Press',{exact:true}).click();
   await page.getByRole('button', { name: 'Complete Bench Press set 1', exact: true }).click();
   await page.getByRole('button', { name: 'Finish & save workout', exact: true }).click();
   await page.getByRole('button', { name: 'Train', exact: true }).click();

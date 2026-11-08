@@ -4,6 +4,8 @@ export interface Position {
   setId: string;
 }
 export interface WorkoutController {
+  exerciseCards?: Record<string, boolean>;
+  pendingCardCollapse?: string[];
   bubblePosition?: { x: number; y: number };
   phase: 'warmup' | 'set' | 'rest';
   phaseStarted: number;
@@ -30,7 +32,10 @@ export function findSet(w: Workout, p: Position | null) {
 }
 export function ensureController(input: Workout): Workout {
   const w = structuredClone(input);
-  for (const e of w.exercises) for (const s of e.sets) s.id ??= crypto.randomUUID();
+  for (const e of w.exercises) {
+    e.id ||= crypto.randomUUID();
+    for (const s of e.sets) s.id ??= crypto.randomUUID();
+  }
   w.controller ??= {
     phase: 'warmup',
     phaseStarted: w.started,
