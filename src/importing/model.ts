@@ -193,7 +193,6 @@ export function assertProgram(value: unknown): asserts value is TrainingProgram 
     typeof p.source.text !== 'string' ||
     typeof p.source.format !== 'string' ||
     !Array.isArray(p.workouts) ||
-    !p.workouts.length ||
     !p.workouts.every(workout) ||
     !issues(p.issues) ||
     (p.rotation !== null &&

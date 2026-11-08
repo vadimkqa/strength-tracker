@@ -1,3 +1,4 @@
+import { migratePrograms, currentProgram } from './programs';
 import { openStore, parseData, mergeBackup, type Data } from './data';
 import { ensureController } from './controller';
 export const BACKUP_FILENAME = 'strength-tracker-backup.json';
@@ -23,6 +24,7 @@ export interface BackupPreview {
     workouts: number;
     completedSets: number;
     templates: number;
+    programs: number;
     exerciseNames: number;
     activeSession: string | null;
     program: string | null;
@@ -113,7 +115,10 @@ export function inspectBackup(source: unknown): BackupPreview {
     exportedAt = backup.exportedAt;
   }
   const data = validateData(value);
-  const names = new Set(Object.values(data.plan).flatMap((rows) => rows.map((r) => r[0])));
+  const plans = data.programs
+    ? data.programs.flatMap((p) => Object.values(p.templates))
+    : Object.values(data.plan);
+  const names = new Set(plans.flatMap((rows) => rows.map((r) => r[0])));
   return {
     source: structuredClone(source),
     data,
@@ -126,10 +131,11 @@ export function inspectBackup(source: unknown): BackupPreview {
         (n, w) => n + w.exercises.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0),
         0,
       ),
-      templates: Object.keys(data.plan).length,
+      templates: plans.length,
+      programs: data.programs?.length || (data.trainingProgram ? 1 : 0),
       exerciseNames: names.size,
       activeSession: data.active?.displayName || data.active?.name || null,
-      program: data.trainingProgram?.name || null,
+      program: currentProgram(data)?.name || data.trainingProgram?.name || null,
       snapshots: archives.length,
     },
   };
@@ -199,7 +205,13 @@ export async function restoreDatabaseBackup(
 ) {
   if (confirmed !== true) throw Error('Confirm restoration after reviewing the validated backup.');
   const preview = inspectBackup(source);
-  const next = mergeBackup(structuredClone(current), structuredClone(preview.data));
+  const next = mergeBackup(
+    structuredClone(current),
+    migratePrograms(
+      structuredClone(preview.data),
+      preview.archives.map((r) => r.value),
+    ),
+  );
   if (next.active && !next.active.controller) {
     for (const exercise of next.active.exercises) exercise.id ||= crypto.randomUUID();
     next.active = ensureController(next.active);

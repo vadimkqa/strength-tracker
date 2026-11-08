@@ -1,3 +1,4 @@
+import { migratePrograms } from './programs';
 import 'fake-indexeddb/auto';
 import { it, expect } from 'vitest';
 import { emptyData, createWorkout, saveData, loadData, type Workout } from './data';
@@ -106,6 +107,6 @@ it('persists edited inputs and independent references across storage reload', as
   const db = crypto.randomUUID();
   await saveData(d, db);
   const restored = await loadData({ getItem: () => null }, db);
-  expect(restored).toEqual(d);
+  expect(restored).toEqual(migratePrograms(d));
   expect(restored.active!.exercises[0].previousPerformance!.sets[1].weight).toBe('100');
 });

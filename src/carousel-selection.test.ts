@@ -112,6 +112,7 @@ it('derives ordering from changed weekday metadata and preserves selection by st
 
 it('manual week selection preserves the implicit initial day when week orders differ', () => {
   const d = structuredClone(base);
+  delete d.carouselWorkout;
   d.rotation!.sessions.find((s) => s.week === 1 && s.workout === workouts[2].key)!.day = 'Monday';
   expect(carouselIndex(d)).toBe(0);
   const next = chooseWeek(d, 2);

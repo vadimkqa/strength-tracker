@@ -4,6 +4,7 @@ export interface Position {
   setId: string;
 }
 export interface WorkoutController {
+  removedSets?: { exerciseId: string; set: SetEntry; removedAt: number }[];
   exerciseCards?: Record<string, boolean>;
   pendingCardCollapse?: string[];
   bubblePosition?: { x: number; y: number };

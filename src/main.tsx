@@ -2,7 +2,8 @@ import { ExerciseCard } from './ExerciseCard';
 import { syncExerciseCards } from './exercise-cards';
 import { BackupPanel } from './BackupPanel';
 import { BACKUP_FILENAME, restoreDatabaseBackup } from './backup';
-import { resizeTemplateSets } from './importing/saving';
+import { ProgramEditor } from './ProgramEditor';
+import { currentProgram } from './programs';
 import type { TrainingProgram } from './importing/model';
 import { carouselIndex, chooseWorkout, chooseWeek, workoutDifficulty } from './carousel-selection';
 import { useKeyboardViewport } from './useKeyboardViewport';
@@ -75,8 +76,7 @@ function App() {
     [error, setError] = useState(''),
     [fatal, setFatal] = useState(''),
     [pending, setPending] = useState(0),
-    [restoring, setRestoring] = useState(false),
-    [planKey, setPlanKey] = useState<string>(workouts[0].key);
+    [restoring, setRestoring] = useState(false);
   const current = useRef<Data | null>(null),
     queue = useRef(Promise.resolve()),
     importing = useRef(false),
@@ -205,8 +205,6 @@ function App() {
       const next = await saveImportedPlan(current.current, draft, true);
       current.current = next;
       setData(next);
-      if (next.rotation?.sessions[0]) setPlanKey(next.rotation.sessions[0].key);
-      else if (next.trainingProgram?.workouts[0]) setPlanKey(next.trainingProgram.workouts[0].id);
       setError('');
     } finally {
       importing.current = false;
@@ -263,7 +261,7 @@ function App() {
         week: programTemplate.week,
       }
     : data.rotation?.sessions.find(
-        (s) => s.week === (data.rotationWeek || 1) && s.workout === cards[index].key,
+        (s) => s.week === (data.rotationWeek || 1) && s.workout === cards[index]?.key,
       );
   const selectedIntensity = workoutDifficulty(data, index);
   return (
@@ -302,123 +300,150 @@ function App() {
         {tab === 'Train' && (
           <>
             {!active ? (
-              <>
-                <div className="page-title">
-                  <p className="eyebrow">BUILD YOUR STRONGER SELF</p>
-                  <h1>
-                    Make every
-                    <br /> <em>rep count.</em>
-                  </h1>
-                  <p>Choose your focus. Set your pace.</p>
-                </div>
-                <div className="section-title">
-                  <h2>Your workout</h2>
-                  <span>
-                    {String(index + 1).padStart(2, '0')} / {String(cards.length).padStart(2, '0')}
-                  </span>
-                </div>
-                {(data.rotation || data.trainingProgram?.rotation) && (
-                  <div className="rotation-selection">
-                    <label htmlFor="rotation-week">TRAINING ROTATION</label>
-                    <select
-                      id="rotation-week"
-                      value={data.rotationWeek || 1}
-                      onChange={(e) => change((d) => chooseWeek(d, Number(e.target.value)))}
-                    >
-                      {(data.rotation?.weeks || data.trainingProgram?.rotation?.weeks || []).map(
-                        (w) => (
-                          <option key={w} value={w}>
-                            Week {w}
-                          </option>
-                        ),
-                      )}
-                    </select>
-                    <p className="muted">
-                      {rotationSession
-                        ? `${rotationSession.day} · ${rotationSession.intensity ? (/^(hard|heavy)$/i.test(rotationSession.intensity) ? 'Hard' : /^easy$/i.test(rotationSession.intensity) ? 'Easy' : rotationSession.intensity) : 'Intensity unspecified'} session`
-                        : 'No session scheduled for this workout in this week.'}
-                    </p>
+              cards.length ? (
+                <>
+                  <div className="page-title">
+                    <p className="eyebrow">BUILD YOUR STRONGER SELF</p>
+                    <h1>
+                      Make every
+                      <br /> <em>rep count.</em>
+                    </h1>
+                    <p>Choose your focus. Set your pace.</p>
                   </div>
-                )}
-                <WorkoutCarousel
-                  ref={carousel}
-                  selected={index}
-                  onSelect={(i, wrap = 0) => change((d) => chooseWorkout(d, i, wrap))}
-                  plan={data.plan}
-                  week={selectedIntensity}
-                  program={data.trainingProgram}
-                  preferredIntensity={data.week}
-                  rotation={data.rotation}
-                  rotationWeek={data.rotationWeek || 1}
-                />
-                <div className="pagination" aria-label="Choose workout">
-                  {cards.map((c, i) => (
-                    <button
-                      key={c.key}
-                      aria-label={`Select ${c.name}`}
-                      aria-current={index === i ? 'true' : undefined}
-                      className={index === i ? 'selected' : ''}
-                      onClick={() => carousel.current?.select(i)}
-                    />
-                  ))}
-                </div>
-                <div className="intensity">
-                  <span className="eyebrow">TRAINING INTENSITY</span>
-                  <div className="segmented" role="group" aria-label="Training intensity">
-                    {['easy', 'heavy'].map((w) => (
-                      <button
-                        key={w}
-                        aria-pressed={selectedIntensity === w}
-                        className={selectedIntensity === w ? 'chosen' : ''}
-                        onClick={() =>
-                          change((d) =>
-                            d.trainingProgram?.source.format === 'legacy-txt'
-                              ? { ...d, week: w, difficultyOverride: undefined }
-                              : rotationSession
-                                ? {
-                                    ...d,
-                                    difficultyOverride: { key: rotationSession.key, value: w },
-                                  }
-                                : { ...d, week: w },
-                          )
-                        }
+                  <div className="section-title">
+                    <h2>Your workout</h2>
+                    <span>
+                      {String(index + 1).padStart(2, '0')} / {String(cards.length).padStart(2, '0')}
+                    </span>
+                  </div>
+                  {(data.rotation || data.trainingProgram?.rotation) && (
+                    <div className="rotation-selection">
+                      <label htmlFor="rotation-week">TRAINING ROTATION</label>
+                      <select
+                        id="rotation-week"
+                        value={data.rotationWeek || 1}
+                        onChange={(e) => change((d) => chooseWeek(d, Number(e.target.value)))}
                       >
-                        {w === 'heavy' ? 'HARD' : 'EASY'}
-                      </button>
+                        {(data.rotation?.weeks || data.trainingProgram?.rotation?.weeks || []).map(
+                          (w) => (
+                            <option key={w} value={w}>
+                              Week {w}
+                            </option>
+                          ),
+                        )}
+                      </select>
+                      <p className="muted">
+                        {rotationSession
+                          ? `${rotationSession.day} · ${rotationSession.intensity ? (/^(hard|heavy)$/i.test(rotationSession.intensity) ? 'Hard' : /^easy$/i.test(rotationSession.intensity) ? 'Easy' : rotationSession.intensity) : 'Intensity unspecified'} session`
+                          : 'No session scheduled for this workout in this week.'}
+                      </p>
+                    </div>
+                  )}
+                  <WorkoutCarousel
+                    ref={carousel}
+                    selected={index}
+                    onSelect={(i, wrap = 0) => change((d) => chooseWorkout(d, i, wrap))}
+                    plan={data.plan}
+                    week={selectedIntensity}
+                    program={data.trainingProgram}
+                    preferredIntensity={data.week}
+                    rotation={data.rotation}
+                    rotationWeek={data.rotationWeek || 1}
+                  />
+                  <div className="pagination" aria-label="Choose workout">
+                    {cards.map((c, i) => (
+                      <button
+                        key={c.key}
+                        aria-label={`Select ${c.name}`}
+                        aria-current={index === i ? 'true' : undefined}
+                        className={index === i ? 'selected' : ''}
+                        onClick={() => carousel.current?.select(i)}
+                      />
                     ))}
                   </div>
-                </div>
-                <button
-                  className="primary start"
-                  disabled={
-                    (!!data.rotation || !!programTemplate) &&
-                    (!rotationSession || !data.plan[rotationSession.key])
-                  }
-                  onClick={() =>
-                    change((d) => ({
-                      ...d,
-                      active: rotationSession
-                        ? createWorkout(
-                            rotationSession.key,
-                            selectedIntensity,
-                            d.plan,
-                            Date.now(),
-                            d.history,
-                            programTemplate && !programTemplate.legacyKey
-                              ? {
-                                  displayName: programTemplate.name,
-                                  cycleWeek: programTemplate.week,
-                                }
-                              : undefined,
-                          )
-                        : createWorkout(cards[index].key, d.week, d.plan, Date.now(), d.history),
-                    }))
-                  }
-                >
-                  START WORKOUT <span>→</span>
-                </button>
-                <p className="footnote">Your training. Your data. Always with you.</p>
-              </>
+                  <div className="intensity">
+                    <span className="eyebrow">TRAINING INTENSITY</span>
+                    <div className="segmented" role="group" aria-label="Training intensity">
+                      {['easy', 'heavy'].map((w) => (
+                        <button
+                          key={w}
+                          aria-pressed={selectedIntensity === w}
+                          className={selectedIntensity === w ? 'chosen' : ''}
+                          onClick={() =>
+                            change((d) =>
+                              ['legacy-txt', 'built-in'].includes(
+                                d.trainingProgram?.source.format || '',
+                              )
+                                ? { ...d, week: w, difficultyOverride: undefined }
+                                : rotationSession
+                                  ? {
+                                      ...d,
+                                      difficultyOverride: { key: rotationSession.key, value: w },
+                                    }
+                                  : { ...d, week: w },
+                            )
+                          }
+                        >
+                          {w === 'heavy' ? 'HARD' : 'EASY'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {currentProgram(data)?.review && (
+                    <p className="notice">
+                      Review this program's ownership in Settings before starting it.
+                    </p>
+                  )}
+                  <button
+                    className="primary start"
+                    disabled={
+                      !!currentProgram(data)?.review ||
+                      ((!!data.rotation || !!programTemplate) &&
+                        (!rotationSession || !data.plan[rotationSession.key]))
+                    }
+                    onClick={() =>
+                      change((d) => ({
+                        ...d,
+                        active: {
+                          ...(rotationSession
+                            ? createWorkout(
+                                rotationSession.key,
+                                selectedIntensity,
+                                d.plan,
+                                Date.now(),
+                                d.history,
+                                programTemplate && !programTemplate.legacyKey
+                                  ? {
+                                      displayName: programTemplate.name,
+                                      cycleWeek: programTemplate.week,
+                                    }
+                                  : undefined,
+                              )
+                            : createWorkout(
+                                cards[index]?.key,
+                                d.week,
+                                d.plan,
+                                Date.now(),
+                                d.history,
+                              )),
+                          programId: d.activeProgramId,
+                        },
+                      }))
+                    }
+                  >
+                    START WORKOUT <span>→</span>
+                  </button>
+                  <p className="footnote">
+                    {currentProgram(data)?.name || 'Your training. Your data. Always with you.'}
+                  </p>
+                </>
+              ) : (
+                <section className="card">
+                  <h2>{currentProgram(data)?.name}</h2>
+                  <p>This program has no workout sessions. Review its program notes in Settings.</p>
+                  <button onClick={() => setTab('Settings')}>Open program editor</button>
+                </section>
+              )
             ) : (
               <>
                 <div className="section-title">
@@ -641,74 +666,7 @@ function App() {
             </div>
             <BackupPanel data={data} ready={!pending && !restoring} onRestore={importData} />
             <PlanImporter onApply={applyPlan} />
-            <section className="card">
-              <h2>Workout plan</h2>
-              <p className="muted">Set counts apply to future workouts.</p>
-              <label htmlFor="plan">WORKOUT TEMPLATE</label>
-              <select
-                id="plan"
-                value={data.plan[planKey] ? planKey : Object.keys(data.plan)[0]}
-                onChange={(e) => setPlanKey(e.target.value)}
-              >
-                {Object.keys(data.plan).map((k) => (
-                  <option key={k} value={k}>
-                    {data.trainingProgram?.workouts.find((w) => w.id === k && !w.legacyKey)?.name ||
-                      label(k)}
-                  </option>
-                ))}
-              </select>
-              {(data.plan[planKey] || data.plan[Object.keys(data.plan)[0]]).map(
-                ([name, count, rest], i) => (
-                  <div className="plan-row" key={name}>
-                    <div>
-                      <b>{name}</b>
-                      <p className="muted">
-                        {count ?? 'Unspecified'} sets ·{' '}
-                        {rest === null ? 'Rest unspecified' : `${rest}s rest`}
-                      </p>
-                    </div>
-                    <div className="stepper">
-                      <button
-                        aria-label={`Fewer sets ${name}`}
-                        disabled={count === null || count <= 1}
-                        onClick={() =>
-                          change((d) => {
-                            const ex =
-                              d.plan[d.plan[planKey] ? planKey : Object.keys(d.plan)[0]][i];
-                            return resizeTemplateSets(
-                              d,
-                              d.plan[planKey] ? planKey : Object.keys(d.plan)[0],
-                              i,
-                              Math.max(1, (ex[1] ?? 0) - 1),
-                            );
-                          })
-                        }
-                      >
-                        −
-                      </button>
-                      <button
-                        aria-label={`More sets ${name}`}
-                        disabled={count !== null && count >= (data.trainingProgram ? 100 : 12)}
-                        onClick={() =>
-                          change((d) => {
-                            const ex =
-                              d.plan[d.plan[planKey] ? planKey : Object.keys(d.plan)[0]][i];
-                            return resizeTemplateSets(
-                              d,
-                              d.plan[planKey] ? planKey : Object.keys(d.plan)[0],
-                              i,
-                              (ex[1] ?? 0) + 1,
-                            );
-                          })
-                        }
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                ),
-              )}
-            </section>
+            <ProgramEditor data={data} change={change} />
             <section className="card">
               <h2>Rest preferences</h2>
               <label htmlFor="default-rest">DEFAULT REST FOR NEW EXERCISES</label>

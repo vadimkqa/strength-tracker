@@ -170,7 +170,7 @@ test('uploaded five-day plan is reviewed explicitly, preserves source cutoff, an
     .check();
   await preview
     .getByRole('checkbox', {
-      name: 'I confirm replacing the active training plan; preserve workout history and unspecified values',
+      name: 'I confirm saving this independent program and making it active; preserve existing programs, history and unspecified values',
       exact: true,
     })
     .check();

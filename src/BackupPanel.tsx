@@ -200,7 +200,9 @@ export function BackupPanel({ data, ready, onRestore }: Props) {
             <dd>{review.preview.summary.templates}</dd>
             <dt>Exercise names in plans</dt>
             <dd>{review.preview.summary.exerciseNames}</dd>
-            <dt>Training program</dt>
+            <dt>Saved training programs</dt>
+            <dd>{review.preview.summary.programs}</dd>
+            <dt>Active training program</dt>
             <dd>{review.preview.summary.program || 'Legacy templates'}</dd>
             <dt>Active session</dt>
             <dd>{review.preview.summary.activeSession || 'None'}</dd>

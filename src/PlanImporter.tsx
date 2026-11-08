@@ -672,6 +672,17 @@ export function PlanImporter({ onApply }: Props) {
               </details>
             );
           })}
+          <label>
+            PROGRAM NAME
+            <input
+              aria-label="Imported program name"
+              value={draft.programName ?? 'Imported training plan'}
+              onChange={(e) => {
+                setDraft({ ...draft, programName: e.target.value });
+                setConfirmed(false);
+              }}
+            />
+          </label>
           <div className="import-summary">
             <h3>Templates to apply</h3>
             {Object.keys(groups).length ? (
@@ -689,8 +700,8 @@ export function PlanImporter({ onApply }: Props) {
               </p>
             )}
             <p className="muted">
-              History, PRs and active sessions stay intact. Unspecified rests and set counts stay
-              unset. A pre-import snapshot is saved.
+              Each import is saved as an independent program. History, PRs and active sessions stay
+              intact. Unspecified rests and set counts stay unset. A pre-import snapshot is saved.
             </p>
           </div>
           <label className="checkbox-label">

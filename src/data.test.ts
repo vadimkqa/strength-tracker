@@ -1,3 +1,4 @@
+import { migratePrograms } from './programs';
 import 'fake-indexeddb/auto';
 import { describe, it, expect } from 'vitest';
 import {
@@ -28,7 +29,7 @@ describe('safe v1 migration', () => {
     const raw = JSON.stringify(d);
     const storage = { getItem: (key: string) => (key === LEGACY_KEY ? raw : null) };
     const dbname = name();
-    expect(await loadData(storage, dbname)).toEqual(d);
+    expect(await loadData(storage, dbname)).toEqual(migratePrograms(d));
     expect(storage.getItem(LEGACY_KEY)).toBe(raw);
     const db = await openStore(dbname);
     expect((await db.getAll('backups'))[0].raw).toBe(raw);
@@ -71,7 +72,7 @@ describe('safe v1 migration', () => {
       dbname = name();
     await saveData(d, dbname);
     await expect(restoreBackup(d, { history: [] }, dbname)).rejects.toThrow();
-    expect(await loadData({ getItem: () => null }, dbname)).toEqual(d);
+    expect(await loadData({ getItem: () => null }, dbname)).toEqual(migratePrograms(d));
   });
 });
 describe('core workouts', () => {
@@ -103,7 +104,7 @@ describe('core workouts', () => {
     expect(result.history[1]).toEqual(d.history[0]);
     expect(result.active).toBeNull();
     await saveData(result, dbname);
-    expect(await loadData({ getItem: () => null }, dbname)).toEqual(result);
+    expect(await loadData({ getItem: () => null }, dbname)).toEqual(migratePrograms(result));
   });
 });
 

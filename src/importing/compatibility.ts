@@ -12,7 +12,7 @@ export function legacyProgram(
   return {
     schemaVersion: 1,
     id: `program-${stableId(draft.source)}`,
-    name: 'Imported training plan',
+    name: draft.programName?.trim() || 'Imported training plan',
     source: {
       name: 'Training plan',
       format: draft.rotation ? 'txt' : 'legacy-txt',
