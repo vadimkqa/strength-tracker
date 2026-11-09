@@ -302,41 +302,35 @@ function App() {
             {!active ? (
               cards.length ? (
                 <>
-                  <div className="page-title">
-                    <p className="eyebrow">BUILD YOUR STRONGER SELF</p>
-                    <h1>
-                      Make every
-                      <br /> <em>rep count.</em>
-                    </h1>
-                    <p>Choose your focus. Set your pace.</p>
-                  </div>
-                  <div className="section-title">
-                    <h2>Your workout</h2>
-                    <span>
-                      {String(index + 1).padStart(2, '0')} / {String(cards.length).padStart(2, '0')}
-                    </span>
-                  </div>
-                  {(data.rotation || data.trainingProgram?.rotation) && (
+                  <h1 className="visually-hidden">
+                    Train · {currentProgram(data)?.name || 'Strength Tracker'}
+                  </h1>
+                  {(data.rotation?.weeks || data.trainingProgram?.rotation?.weeks || []).length >
+                    1 && (
                     <div className="rotation-selection">
-                      <label htmlFor="rotation-week">TRAINING ROTATION</label>
-                      <select
+                      <div
                         id="rotation-week"
-                        value={data.rotationWeek || 1}
-                        onChange={(e) => change((d) => chooseWeek(d, Number(e.target.value)))}
+                        className="segmented week-segments"
+                        role="group"
+                        aria-label="TRAINING ROTATION"
+                        data-week={data.rotationWeek || 1}
                       >
                         {(data.rotation?.weeks || data.trainingProgram?.rotation?.weeks || []).map(
                           (w) => (
-                            <option key={w} value={w}>
+                            <button
+                              key={w}
+                              type="button"
+                              aria-pressed={(data.rotationWeek || 1) === w}
+                              className={(data.rotationWeek || 1) === w ? 'chosen' : ''}
+                              onClick={() => {
+                                if ((data.rotationWeek || 1) !== w) change((d) => chooseWeek(d, w));
+                              }}
+                            >
                               Week {w}
-                            </option>
+                            </button>
                           ),
                         )}
-                      </select>
-                      <p className="muted">
-                        {rotationSession
-                          ? `${rotationSession.day} · ${rotationSession.intensity ? (/^(hard|heavy)$/i.test(rotationSession.intensity) ? 'Hard' : /^easy$/i.test(rotationSession.intensity) ? 'Easy' : rotationSession.intensity) : 'Intensity unspecified'} session`
-                          : 'No session scheduled for this workout in this week.'}
-                      </p>
+                      </div>
                     </div>
                   )}
                   <WorkoutCarousel
@@ -349,46 +343,47 @@ function App() {
                     preferredIntensity={data.week}
                     rotation={data.rotation}
                     rotationWeek={data.rotationWeek || 1}
-                  />
-                  <div className="pagination" aria-label="Choose workout">
-                    {cards.map((c, i) => (
-                      <button
-                        key={c.key}
-                        aria-label={`Select ${c.name}`}
-                        aria-current={index === i ? 'true' : undefined}
-                        className={index === i ? 'selected' : ''}
-                        onClick={() => carousel.current?.select(i)}
-                      />
-                    ))}
-                  </div>
-                  <div className="intensity">
-                    <span className="eyebrow">TRAINING INTENSITY</span>
-                    <div className="segmented" role="group" aria-label="Training intensity">
-                      {['easy', 'heavy'].map((w) => (
-                        <button
-                          key={w}
-                          aria-pressed={selectedIntensity === w}
-                          className={selectedIntensity === w ? 'chosen' : ''}
-                          onClick={() =>
-                            change((d) =>
-                              ['legacy-txt', 'built-in'].includes(
-                                d.trainingProgram?.source.format || '',
+                  >
+                    <div className="intensity">
+                      <span className="eyebrow">TRAINING INTENSITY</span>
+                      <div className="segmented" role="group" aria-label="Training intensity">
+                        {['easy', 'heavy'].map((w) => (
+                          <button
+                            key={w}
+                            aria-pressed={selectedIntensity === w}
+                            className={selectedIntensity === w ? 'chosen' : ''}
+                            onClick={() =>
+                              change((d) =>
+                                ['legacy-txt', 'built-in'].includes(
+                                  d.trainingProgram?.source.format || '',
+                                )
+                                  ? { ...d, week: w, difficultyOverride: undefined }
+                                  : rotationSession
+                                    ? {
+                                        ...d,
+                                        difficultyOverride: { key: rotationSession.key, value: w },
+                                      }
+                                    : { ...d, week: w },
                               )
-                                ? { ...d, week: w, difficultyOverride: undefined }
-                                : rotationSession
-                                  ? {
-                                      ...d,
-                                      difficultyOverride: { key: rotationSession.key, value: w },
-                                    }
-                                  : { ...d, week: w },
-                            )
-                          }
-                        >
-                          {w === 'heavy' ? 'HARD' : 'EASY'}
-                        </button>
+                            }
+                          >
+                            {w === 'heavy' ? 'HARD' : 'EASY'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="pagination" aria-label="Choose workout">
+                      {cards.map((c, i) => (
+                        <button
+                          key={c.key}
+                          aria-label={`Select ${c.name}`}
+                          aria-current={index === i ? 'true' : undefined}
+                          className={index === i ? 'selected' : ''}
+                          onClick={() => carousel.current?.select(i)}
+                        />
                       ))}
                     </div>
-                  </div>
+                  </WorkoutCarousel>
                   {currentProgram(data)?.review && (
                     <p className="notice">
                       Review this program's ownership in Settings before starting it.
@@ -433,9 +428,6 @@ function App() {
                   >
                     START WORKOUT <span>→</span>
                   </button>
-                  <p className="footnote">
-                    {currentProgram(data)?.name || 'Your training. Your data. Always with you.'}
-                  </p>
                 </>
               ) : (
                 <section className="card">

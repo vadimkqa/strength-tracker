@@ -81,7 +81,7 @@ test('confirmed rotation keeps history and an active session; all eight sessions
   await page.getByRole('button', { name: 'START WORKOUT' }).click();
   await page.getByRole('spinbutton', { name: 'Weight Bench Press set 1', exact: true }).fill('100');
   await page.getByRole('spinbutton', { name: 'Reps Bench Press set 1', exact: true }).fill('5');
-  await page.getByLabel('Set options for Bench Press',{exact:true}).click();
+  await page.getByLabel('Set options for Bench Press', { exact: true }).click();
   await page.getByRole('button', { name: 'Complete Bench Press set 1', exact: true }).click();
   await page.getByRole('button', { name: 'Finish & save workout', exact: true }).click();
   await page.getByRole('button', { name: 'Train', exact: true }).click();
@@ -116,11 +116,13 @@ test('confirmed rotation keeps history and an active session; all eight sessions
   for (let i = 0; i < expected.length; i++) {
     const [card, day, intensity] = expected[i],
       week = i < 4 ? 1 : 2;
-    await page.getByLabel('TRAINING ROTATION', { exact: true }).selectOption(String(week));
+    await page.getByRole('button', { name: `Week ${week}`, exact: true }).click();
     await page.getByRole('button', { name: `Select ${card}`, exact: true }).click();
     await expect(page.getByRole('article', { name: card, exact: true })).toHaveClass(/selected/);
-    await expect(page.locator('.rotation-selection p')).toHaveText(
-      `${day} · ${intensity === 'hard' ? 'Hard' : 'Easy'} session`,
+    await expect(page.locator('.stack-front .stack-card-top')).toContainText(day);
+    await expect(page.locator('.stack-front .stack-card-top')).toContainText(`Week ${week}`);
+    await expect(page.locator('.stack-front .stack-intensity')).toHaveText(
+      intensity === 'hard' ? 'HEAVY' : 'EASY',
     );
     await page.getByRole('button', { name: 'START WORKOUT' }).click();
     const current = (await saved(page)).active;
@@ -130,7 +132,10 @@ test('confirmed rotation keeps history and an active session; all eight sessions
     await page.getByRole('button', { name: 'Discard workout', exact: true }).click();
   }
   await page.reload();
-  await expect(page.getByLabel('TRAINING ROTATION', { exact: true })).toHaveValue('2');
+  await expect(page.getByLabel('TRAINING ROTATION', { exact: true })).toHaveAttribute(
+    'data-week',
+    '2',
+  );
 });
 test('manual prescription corrections update warnings without renumbering untouched source entries', async ({
   page,

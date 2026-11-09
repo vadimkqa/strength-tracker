@@ -1,4 +1,11 @@
-import { useImperativeHandle, useRef, useState, type Ref, type CSSProperties } from 'react';
+import {
+  useImperativeHandle,
+  useRef,
+  useState,
+  type Ref,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { carouselWorkouts, templateKey, type Rotation } from './workouts';
 import type { TrainingProgram } from './importing/model';
 import type { Plan } from './templates';
@@ -6,6 +13,7 @@ export interface CarouselHandle {
   select: (index: number) => void;
 }
 interface Props {
+  children?: ReactNode;
   ref?: Ref<CarouselHandle>;
   selected: number;
   onSelect: (index: number, wrap?: -1 | 0 | 1) => void;
@@ -26,6 +34,7 @@ export function WorkoutCarousel({
   rotationWeek,
   program,
   preferredIntensity,
+  children,
 }: Props) {
   const workouts = carouselWorkouts(rotation, rotationWeek, program, preferredIntensity);
   const count = workouts.length;
@@ -52,13 +61,14 @@ export function WorkoutCarousel({
         aria-label="Workout selection"
         tabIndex={0}
         onKeyDown={(e) => {
+          if ((e.target as HTMLElement).closest('.home-card-controls')) return;
           if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
             e.preventDefault();
             choose(selected + (e.key === 'ArrowRight' ? 1 : -1), true);
           }
         }}
         onPointerDown={(e) => {
-          if (e.button !== 0) return;
+          if (e.button !== 0 || (e.target as HTMLElement).closest('.home-card-controls')) return;
           if (e.pointerType === 'mouse') e.preventDefault();
           suppressClick.current = false;
           const card = (e.target as HTMLElement).closest<HTMLElement>('[data-card-index]');
@@ -201,6 +211,7 @@ export function WorkoutCarousel({
                   <span aria-hidden="true">→</span>
                 </div>
               </div>
+              {position === 'front' && <div className="home-card-controls">{children}</div>}
             </article>
           );
         })}
