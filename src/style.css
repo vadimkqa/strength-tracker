@@ -2457,3 +2457,18 @@ main.home-screen {
   padding: 12px 0;
   font-size: 11px;
 }
+
+/* Calendar context fits the existing gap above the deck; no card or branding restyling. */
+.home-screen .calendar-context {
+  flex: 0 0 10px;
+  height: 10px;
+  margin: -11px 0 1px;
+  text-align: center;
+  font-size: 9px;
+  line-height: 10px;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+.calendar-settings details {
+  margin-block: 16px;
+}

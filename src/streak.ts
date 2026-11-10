@@ -1,3 +1,6 @@
+import { localDate, calendarWeek, addDays, validTimeZone } from './calendar';
+export { localDate, calendarWeek, addDays, validTimeZone } from './calendar';
+import { scheduleMetadata } from './program-schedule';
 import type { Data, Workout } from './data';
 import { currentProgram, migratePrograms, programView, type SavedProgram } from './programs';
 import { validLog } from './controller';
@@ -137,38 +140,6 @@ export interface StreakState {
   weeks: StreakWeek[];
   awards: StreakAward[];
 }
-export function validTimeZone(zone: string) {
-  try {
-    new Intl.DateTimeFormat('en', { timeZone: zone }).format();
-    return true;
-  } catch {
-    return false;
-  }
-}
-const formatters = new Map<string, Intl.DateTimeFormat>();
-export function localDate(time: number, zone: string) {
-  if (!formatters.has(zone))
-    formatters.set(
-      zone,
-      new Intl.DateTimeFormat('en-US', {
-        timeZone: zone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }),
-    );
-  const parts = formatters.get(zone)!.formatToParts(time);
-  const part = (type: string) => parts.find((p) => p.type === type)!.value;
-  return `${part('year')}-${part('month')}-${part('day')}`;
-}
-export function addDays(date: string, days: number) {
-  return new Date(Date.parse(date + 'T12:00:00Z') + days * 86400000).toISOString().slice(0, 10);
-}
-export function calendarWeek(time: number, zone: string) {
-  const date = localDate(time, zone),
-    day = new Date(date + 'T12:00:00Z').getUTCDay();
-  return addDays(date, -((day + 6) % 7));
-}
 const distance = (a: string, b: string) =>
   (Date.parse(b + 'T12:00Z') - Date.parse(a + 'T12:00Z')) / 604800000;
 /** Only completed, saved, valid logs qualify. Explicit practice/test flags are never inferred from names. */
@@ -226,57 +197,17 @@ function policyFor(
   anchorCycle: number,
   target: number | null,
 ): StreakPolicy {
-  const view = programView(p),
-    cycleNumbers = view.rotation?.weeks.length
-      ? [...new Set(view.rotation.weeks)]
-      : [...new Set(view.workouts.map((w) => w.week))].sort((a, b) => a - b);
-  const cycles = cycleNumbers.map((week) => {
-    const sessions: StreakSession[] = [];
-    for (const w of view.workouts
-      .filter((w) => w.week === week)
-      .sort((a, b) => a.order - b.order)) {
-      const variants = ['built-in', 'legacy-txt'].includes(view.source.format);
-      const key = variants ? `${w.day || ''}:${w.slotId}` : w.id;
-      const found = sessions.find((s) => s.key === key);
-      if (found) found.templateIds.push(w.id);
-      else
-        sessions.push({ key, name: `${w.day ? `${w.day} · ` : ''}${w.name}`, templateIds: [w.id] });
-    }
-    return { week, sessions };
-  });
-  const explicitTextWeek = /^\s*week\s+\d+\b/im.test(view.source.text);
-  const sourceRows = view.source.text
-    .split(/\r?\n/)
-    .map((line) => line.split('\t').map((c) => c.trim()));
-  const tableWeek =
-    ['csv', 'xlsx', 'docx'].includes(view.source.format) &&
-    sourceRows.some((row, index) => {
-      const normalized = row.map((c) => c.toLowerCase().replace(/[^a-z]/g, '')),
-        column = normalized.indexOf('week');
-      return (
-        column >= 0 &&
-        normalized.some((c) => ['exercise', 'exercisename', 'movement'].includes(c)) &&
-        normalized.some((c) => ['workout', 'session', 'workoutname'].includes(c)) &&
-        sourceRows
-          .slice(index + 1)
-          .some((r) => /^\d+$/.test(r[column] || '') && cycleNumbers.includes(Number(r[column])))
-      );
-    });
-  const scheduled =
-    !p.review &&
-    view.workouts.length > 0 &&
-    (view.rotation !== null ||
-      view.workouts.every((w) =>
-        /^(?:mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\.?$/i.test(
-          (w.day || '').trim(),
-        ),
-      ) ||
-      explicitTextWeek ||
-      tableWeek);
+  const metadata = scheduleMetadata(p),
+    cycleNumbers = metadata.cycles.map((c) => c.week),
+    cycles = metadata.cycles.map((c) => ({
+      week: c.week,
+      sessions: c.sessions.map(({ key, name, templateIds }) => ({ key, name, templateIds })),
+    })),
+    scheduled = !p.review && metadata.weekly;
   const mode = scheduled ? 'scheduled' : 'manual';
   return {
     id: crypto.randomUUID(),
-    explicitWeeks: view.rotation !== null || explicitTextWeek || tableWeek,
+    explicitWeeks: metadata.explicitWeeks,
     programId: p.id,
     name: p.name,
     fromWeek,
@@ -487,6 +418,14 @@ export function syncStreaks(
       forceCycle ?? data.rotationWeek ?? 1,
       s.targets[active.id] ?? null,
     );
+    if (active.calendar?.enabled) {
+      candidate.anchorWeek = calendarWeek(
+        Date.parse(active.calendar.anchorDate + 'T12:00Z'),
+        'UTC',
+      );
+      candidate.anchorCycle = active.calendar.anchorWeek;
+      candidate.signature += JSON.stringify(active.calendar);
+    }
     if (
       !last ||
       last.programId !== active.id ||
@@ -558,6 +497,12 @@ export function configureStreak(
     !programView(currentProgram(next)!).workouts.some((w) => w.week === options.cycleWeek)
   )
     throw Error('Choose a program week from the imported rotation.');
+  const active = currentProgram(next);
+  if (options.cycleWeek !== undefined && active?.calendar?.enabled) {
+    // Calendar selection and streaks share one anchor; only current/future policies are added below.
+    active.calendar.anchorDate = localDate(now, next.streak!.timeZone);
+    active.calendar.anchorWeek = options.cycleWeek;
+  }
   next = syncStreaks(next, now, 'UTC', options.cycleWeek);
   return next;
 }

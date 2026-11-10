@@ -13,6 +13,7 @@ export interface CarouselHandle {
   select: (index: number) => void;
 }
 interface Props {
+  dayOverrides?: Record<string, number>;
   children?: ReactNode;
   ref?: Ref<CarouselHandle>;
   selected: number;
@@ -35,8 +36,15 @@ export function WorkoutCarousel({
   program,
   preferredIntensity,
   children,
+  dayOverrides,
 }: Props) {
-  const workouts = carouselWorkouts(rotation, rotationWeek, program, preferredIntensity);
+  const workouts = carouselWorkouts(
+    rotation,
+    rotationWeek,
+    program,
+    preferredIntensity,
+    dayOverrides,
+  );
   const count = workouts.length;
   const gesture = useRef<{
     x: number;
