@@ -130,6 +130,7 @@ test('confirmed rotation keeps history and an active session; all eight sessions
     expect(current.exercises[0].rest).toBeNull();
     expect(current.exercises[0].sets[0].prescription.number).toBe(1);
     await page.getByRole('button', { name: 'Discard workout', exact: true }).click();
+    await expect(page.locator('.save-status')).toHaveText('Saved on this device');
   }
   await page.reload();
   await expect(page.getByLabel('TRAINING ROTATION', { exact: true })).toHaveAttribute(

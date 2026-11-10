@@ -126,7 +126,9 @@ test('unsupported native file sharing uses the supported download flow with comp
   const download = await pending;
   expect(download.suggestedFilename()).toBe(BACKUP_FILENAME);
   const file = readFileSync((await download.path())!, 'utf8');
-  expect(parseBackup(file).summary).toMatchObject({ workouts: 1, completedSets: 1, snapshots: 2 });
+  const preview = parseBackup(file);
+  expect(preview.summary).toMatchObject({ workouts: 1, completedSets: 1, snapshots: 3 });
+  expect(preview.archives.map((r) => (r.value as any).kind)).toContain('before-strength-streak');
   await expect(page.getByRole('status').filter({ hasText: 'Download started.' })).toBeVisible();
 });
 test('cancelled sharing is distinct from successful saving and triggers no second download', async ({

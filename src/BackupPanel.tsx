@@ -208,6 +208,16 @@ export function BackupPanel({ data, ready, onRestore }: Props) {
             <dd>{review.preview.summary.activeSession || 'None'}</dd>
             <dt>Safety snapshots</dt>
             <dd>{review.preview.summary.snapshots}</dd>
+            {review.preview.data.streak && (
+              <>
+                <dt>Streak timezone</dt>
+                <dd>{review.preview.data.streak.timeZone}</dd>
+                <dt>Streak requirement snapshots</dt>
+                <dd>{review.preview.data.streak.weeks.length}</dd>
+                <dt>Streak achievement records</dt>
+                <dd>{review.preview.data.streak.awards.length}</dd>
+              </>
+            )}
             <dt>Default rest</dt>
             <dd>{review.preview.data.restDefault}s</dd>
           </dl>

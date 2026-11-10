@@ -1,3 +1,14 @@
+import {
+  calculateStreak,
+  calendarWeek,
+  levelFor,
+  syncStreaks,
+  STREAK_LEVELS,
+  workoutStreakReason,
+} from './streak';
+import { initializeStreaks } from './streak-storage';
+import { StreakIcon } from './StreakIcon';
+import { StreakDashboard } from './StreakDashboard';
 import { ExerciseCard } from './ExerciseCard';
 import { syncExerciseCards } from './exercise-cards';
 import { BackupPanel } from './BackupPanel';
@@ -72,11 +83,16 @@ function App() {
   useKeyboardViewport();
   const [data, setData] = useState<Data | null>(null),
     [tab, setTab] = useState<Tab>('Train'),
+    [recordView, setRecordView] = useState<'weights' | 'streak'>('weights'),
+    [savedData, setSavedData] = useState<Data | null>(null),
+    [celebration, setCelebration] = useState<string | null>(null),
     [now, setNow] = useState(Date.now()),
     [error, setError] = useState(''),
     [fatal, setFatal] = useState(''),
     [pending, setPending] = useState(0),
     [restoring, setRestoring] = useState(false);
+  const committed = useRef<Data | null>(null),
+    toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const current = useRef<Data | null>(null),
     queue = useRef(Promise.resolve()),
     importing = useRef(false),
@@ -86,7 +102,7 @@ function App() {
     let release: (() => void) | undefined;
     const initialize = async () => {
       try {
-        const d = await loadData();
+        let d = await loadData();
         if (d.active) {
           const repaired = ensureController(d.active);
           if (JSON.stringify(repaired) !== JSON.stringify(d.active)) {
@@ -94,7 +110,10 @@ function App() {
             await saveData(d);
           }
         }
+        d = await initializeStreaks(d, Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
         if (alive) {
+          committed.current = d;
+          setSavedData(d);
           current.current = d;
           setData(d);
         }
@@ -131,17 +150,50 @@ function App() {
       release?.();
     };
   }, []);
+  useEffect(() => {
+    const d = current.current;
+    if (
+      d?.streak &&
+      !pending &&
+      calendarWeek(now, d.streak.timeZone) > (d.streak.weeks.at(-1)?.week || '')
+    )
+      change((d) => d);
+  }, [now, pending]);
+  useEffect(() => () => clearTimeout(toastTimer.current), []);
+  function acceptSaved(d: Data, animate = true) {
+    const previous = committed.current;
+    committed.current = d;
+    setSavedData(d);
+    if (!animate || !previous) return;
+    const fresh = d.streak?.awards.filter(
+      (a) => a.valid && !previous.streak?.awards.some((old) => old.id === a.id && old.valid),
+    );
+    const newest = STREAK_LEVELS.filter((l) => fresh?.some((a) => a.id === l.id)).at(-1);
+    if (newest) {
+      setCelebration(newest.id);
+      clearTimeout(toastTimer.current);
+      toastTimer.current = setTimeout(() => setCelebration(null), 6000);
+    }
+  }
+  function showStreak() {
+    setRecordView('streak');
+    setTab('PRs');
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
   function change(fn: (d: Data) => Data) {
     if (!current.current || importing.current) return;
     try {
-      const next = fn(structuredClone(current.current));
+      const next = syncStreaks(fn(structuredClone(current.current)));
       current.current = next;
       setData(next);
       setPending((n) => n + 1);
       queue.current = queue.current
         .catch(() => {})
         .then(() => saveData(next))
-        .then(() => setError(''))
+        .then(() => {
+          acceptSaved(next);
+          setError('');
+        })
         .catch((e) =>
           setError(
             'Changes are not saved. Keep this tab open, export a backup, and retry saving. ' +
@@ -190,6 +242,7 @@ function App() {
       const next = await restoreDatabaseBackup(current.current!, source, true);
       current.current = next;
       setData(next);
+      acceptSaved(next, false);
       setError('');
     } finally {
       importing.current = false;
@@ -205,6 +258,7 @@ function App() {
       const next = await saveImportedPlan(current.current, draft, true);
       current.current = next;
       setData(next);
+      acceptSaved(next, false);
       setError('');
     } finally {
       importing.current = false;
@@ -264,13 +318,16 @@ function App() {
         (s) => s.week === (data.rotationWeek || 1) && s.workout === cards[index]?.key,
       );
   const selectedIntensity = workoutDifficulty(data, index);
+  const streakReport = savedData ? calculateStreak(savedData, now) : null;
+  const streakLevel = levelFor(streakReport?.current || 0);
+  const celebrating = STREAK_LEVELS.find((l) => l.id === celebration);
   return (
     <>
       <main
         inert={restoring}
         className={tab === 'Train' ? (active ? 'active-workout' : 'home-screen') : undefined}
       >
-        <header>
+        <header className={tab === 'Train' && !active ? 'streak-home-header' : undefined}>
           <div className="brand">
             <img
               className="brand-mark"
@@ -289,6 +346,16 @@ function App() {
           <span className="edition">
             2.0 <span>●</span>
           </span>
+          {tab === 'Train' && !active && (
+            <button
+              className="streak-indicator"
+              aria-label={`Strength Streak, ${streakReport?.current || 0} consecutive ${streakReport?.current === 1 ? 'week' : 'weeks'}`}
+              onClick={showStreak}
+            >
+              <StreakIcon level={streakLevel} />
+              <strong>{streakReport?.current || 0}w</strong>
+            </button>
+          )}
         </header>
         {error && (
           <aside role="alert" className="notice">
@@ -503,6 +570,23 @@ function App() {
                       change={activeChange}
                     />
                   ))}
+                  <details className="workout-streak-options">
+                    <summary>Streak eligibility</summary>
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={!!active.streakExcluded}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          activeChange((w) => ({ ...w, streakExcluded: checked }));
+                        }}
+                      />
+                      Practice/test workout (exclude from Strength Streak)
+                    </label>
+                    <p className="muted">
+                      This session will still be saved, without streak credit.
+                    </p>
+                  </details>
                   <button
                     className="primary full"
                     disabled={active.controller?.phase === 'set' || pendingLogs(active).length > 0}
@@ -600,6 +684,27 @@ function App() {
                       </div>
                     ))}
                   </details>
+                  <p className="streak-eligibility muted">
+                    {workoutStreakReason(w, now)
+                      ? `Streak: ${workoutStreakReason(w, now)}`
+                      : 'Valid completed log · streak eligibility also depends on its saved weekly program goal.'}
+                  </p>
+                  <label className="checkbox-label history-streak-exclusion">
+                    <input
+                      type="checkbox"
+                      checked={!!w.streakExcluded}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        change((d) => ({
+                          ...d,
+                          history: d.history.map((item) =>
+                            item.id === w.id ? { ...item, streakExcluded: checked } : item,
+                          ),
+                        }));
+                      }}
+                    />
+                    Exclude from Strength Streak (test or practice)
+                  </label>
                   <button
                     className="danger"
                     onClick={() => {
@@ -620,32 +725,65 @@ function App() {
         )}
         {tab === 'PRs' && (
           <>
-            <div className="page-title">
-              <p className="eyebrow">PROOF OF YOUR EFFORT</p>
-              <h1>Personal records.</h1>
-              <p>Your best completed sets, by exercise.</p>
+            <div className="segmented record-tabs" role="tablist" aria-label="Record views">
+              <button
+                role="tab"
+                id="prs-weights-tab"
+                aria-controls="prs-weights-panel"
+                aria-selected={recordView === 'weights'}
+                className={recordView === 'weights' ? 'chosen' : ''}
+                onClick={() => setRecordView('weights')}
+              >
+                Weight PRs
+              </button>
+              <button
+                role="tab"
+                id="prs-streak-tab"
+                aria-controls="prs-streak-panel"
+                aria-selected={recordView === 'streak'}
+                className={recordView === 'streak' ? 'chosen' : ''}
+                onClick={() => setRecordView('streak')}
+              >
+                Strength Streak
+              </button>
             </div>
-            {records.size === 0 ? (
-              <section className="card empty">
-                <Icon name="PRs" />
-                <h3>Great things take reps.</h3>
-                <p>Log a set and finish your workout to earn your first record.</p>
-                <button onClick={() => setTab('Train')}>Start training →</button>
-              </section>
+            {recordView === 'streak' && savedData?.streak ? (
+              <StreakDashboard
+                data={savedData}
+                now={now}
+                busy={!!pending || restoring}
+                change={change}
+              />
             ) : (
-              [...records].map(([name, r]) => (
-                <section className="card row" key={name}>
-                  <div>
-                    <p className="eyebrow">BEST WEIGHT</p>
-                    <h3>{name}</h3>
-                    <p className="muted">{r.reps} reps</p>
-                  </div>
-                  <strong className="record">
-                    {r.weight}
-                    <small> kg</small>
-                  </strong>
-                </section>
-              ))
+              <div role="tabpanel" id="prs-weights-panel" aria-labelledby="prs-weights-tab">
+                <div className="page-title">
+                  <p className="eyebrow">PROOF OF YOUR EFFORT</p>
+                  <h1>Personal records.</h1>
+                  <p>Your best completed sets, by exercise.</p>
+                </div>
+                {records.size === 0 ? (
+                  <section className="card empty">
+                    <Icon name="PRs" />
+                    <h3>Great things take reps.</h3>
+                    <p>Log a set and finish your workout to earn your first record.</p>
+                    <button onClick={() => setTab('Train')}>Start training →</button>
+                  </section>
+                ) : (
+                  [...records].map(([name, r]) => (
+                    <section className="card row" key={name}>
+                      <div>
+                        <p className="eyebrow">BEST WEIGHT</p>
+                        <h3>{name}</h3>
+                        <p className="muted">{r.reps} reps</p>
+                      </div>
+                      <strong className="record">
+                        {r.weight}
+                        <small> kg</small>
+                      </strong>
+                    </section>
+                  ))
+                )}
+              </div>
             )}
           </>
         )}
@@ -678,6 +816,24 @@ function App() {
             </section>
             <p className="footnote">STRENGTH TRAINER 2.0 · LOCAL FIRST</p>
           </>
+        )}
+        {celebrating && !active && (
+          <aside className="streak-celebration" role="status">
+            <StreakIcon level={celebrating} />
+            <div>
+              <small>ACHIEVEMENT UNLOCKED</small>
+              <strong>{celebrating.name}</strong>
+            </div>
+            <button
+              aria-label="View unlocked streak achievement"
+              onClick={() => {
+                setCelebration(null);
+                showStreak();
+              }}
+            >
+              View
+            </button>
+          </aside>
         )}
         <p className="save-status" aria-live="polite">
           {pending ? 'Saving…' : error ? 'Check saving status above' : 'Saved on this device'}
