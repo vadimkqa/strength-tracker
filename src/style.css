@@ -2146,3 +2146,305 @@ html[data-workout-keyboard='true'] .exercise-collapse {
 main.home-screen {
   padding-bottom: calc(84px + env(safe-area-inset-bottom));
 }
+/* Strength Streak: separate consistency achievements from weight/reps records. */
+.home-screen > .streak-home-header {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px;
+  gap: 4px;
+  padding-bottom: 10px;
+  align-items: center;
+}
+.streak-home-header .brand {
+  gap: 6px;
+}
+.streak-home-header .edition {
+  position: absolute;
+  right: 3px;
+  bottom: 0;
+  font-size: 9px;
+  line-height: 10px;
+  margin: 0;
+}
+.streak-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 64px;
+  min-height: 44px;
+  padding: 3px;
+  background: #18121f;
+  border-color: #654583;
+  border-radius: 12px;
+}
+.streak-indicator .streak-icon {
+  width: 38px;
+  height: 28px;
+  min-width: 0;
+  flex: 1;
+}
+.streak-indicator strong {
+  font-size: 11px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.streak-icon {
+  display: block;
+  width: 180px;
+  height: 84px;
+  max-width: 100%;
+}
+.record-tabs {
+  margin: 0 0 22px;
+}
+.record-tabs button {
+  flex: 1;
+  min-height: 44px;
+  padding: 8px;
+}
+.streak-dashboard .page-title h1 {
+  font-size: 34px;
+}
+.streak-hero {
+  text-align: center;
+}
+.streak-hero > .streak-icon {
+  width: 220px;
+  height: 104px;
+  margin: 0 auto 4px;
+}
+.streak-hero > .eyebrow {
+  font-size: 10px;
+}
+.streak-count {
+  display: block;
+  font-size: 44px;
+  color: var(--highlight);
+  line-height: 1.2;
+  margin-bottom: 10px;
+}
+.streak-count small {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.streak-dashboard progress {
+  width: 100%;
+  height: 8px;
+  border: 0;
+  border-radius: 6px;
+  accent-color: var(--purple);
+  margin: 8px 0;
+}
+.streak-dashboard .muted {
+  font-size: 12px;
+  line-height: 1.65;
+}
+.weekly-progress {
+  display: block;
+  font-size: 25px;
+  color: var(--highlight);
+  margin: 10px 0;
+}
+.streak-settings label {
+  margin-top: 16px;
+}
+.streak-settings input {
+  font-size: 16px;
+}
+.streak-settings > summary,
+.streak-dashboard > details > summary {
+  min-height: 44px;
+  line-height: 1.6;
+}
+.achievement-collection {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.achievement-tile {
+  min-width: 0;
+  border: 1px solid #392749;
+  background: #130e1a;
+  border-radius: 12px;
+  padding: 8px;
+  text-align: center;
+}
+.achievement-tile .streak-icon {
+  width: 100%;
+  height: 70px;
+}
+.achievement-tile h3 {
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 4px 0;
+  min-height: 32px;
+}
+.achievement-tile > span,
+.achievement-tile > small {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.achievement-tile.unlocked {
+  border-color: #7d52a7;
+  background: #201529;
+}
+.achievement-tile.locked .streak-icon {
+  opacity: 0.45;
+}
+.streak-week > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 44px;
+  font-size: 11px;
+}
+.week-status {
+  font-size: 10px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.week-status.success {
+  color: #19df96;
+}
+.week-status.failed {
+  color: #d6a6bf;
+}
+.week-goal {
+  border-top: 1px solid #392749;
+  font-size: 12px;
+  line-height: 1.65;
+  padding-top: 10px;
+}
+.week-goal ul {
+  list-style: none;
+  padding-left: 0;
+  color: var(--muted);
+}
+.week-goal li {
+  padding: 3px 0;
+}
+.history-streak-exclusion {
+  font-size: 11px;
+  line-height: 1.5;
+}
+.streak-eligibility {
+  font-size: 11px;
+  line-height: 1.6;
+  margin-top: 10px;
+}
+.streak-celebration {
+  position: fixed;
+  z-index: 8;
+  left: 24px;
+  right: 24px;
+  bottom: calc(90px + env(safe-area-inset-bottom));
+  max-width: 512px;
+  margin: auto;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--purple);
+  border-radius: 15px;
+  background: #241a30;
+  box-shadow: 0 8px 24px #0008;
+  animation: streak-reveal 0.35s ease-out;
+}
+.streak-celebration .streak-icon {
+  width: 64px;
+  height: 40px;
+  flex: none;
+}
+.streak-celebration div {
+  flex: 1;
+  min-width: 0;
+}
+.streak-celebration small {
+  display: block;
+  font-size: 8px;
+  color: var(--highlight);
+  letter-spacing: 1px;
+}
+.streak-celebration strong {
+  font-size: 12px;
+}
+.streak-celebration button {
+  min-height: 44px;
+  padding: 6px;
+  font-size: 11px;
+}
+@keyframes streak-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .streak-celebration {
+    animation: none;
+  }
+}
+.streak-dashboard .page-title {
+  margin-bottom: 18px;
+}
+.streak-hero.card {
+  padding: 14px 20px;
+}
+.streak-hero > .streak-icon {
+  width: 180px;
+  height: 80px;
+  margin: 0 auto;
+}
+.streak-hero > .eyebrow {
+  margin-bottom: 6px;
+}
+.streak-hero .muted {
+  margin-bottom: 8px;
+}
+.streak-dashboard progress {
+  appearance: none;
+  -webkit-appearance: none;
+  background: #31223e;
+  overflow: hidden;
+}
+.streak-dashboard progress::-webkit-progress-bar {
+  background: #31223e;
+  border-radius: 6px;
+}
+.streak-dashboard progress::-webkit-progress-value {
+  background: var(--purple);
+  border-radius: 6px;
+}
+.streak-dashboard progress::-moz-progress-bar {
+  background: var(--purple);
+  border-radius: 6px;
+}
+.achievement-collection {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.achievement-tile {
+  padding: 6px;
+}
+.achievement-tile .streak-icon {
+  height: 52px;
+}
+.achievement-tile h3 {
+  font-size: 11px;
+}
+.workout-streak-options {
+  margin: 6px 0;
+  padding-top: 0;
+}
+.workout-streak-options > summary {
+  min-height: 44px;
+  padding: 12px 0;
+  font-size: 11px;
+}

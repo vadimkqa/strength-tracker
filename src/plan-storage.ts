@@ -1,3 +1,4 @@
+import { syncStreaks } from './streak';
 import { applyProgram } from './importing/saving';
 import type { TrainingProgram } from './importing/model';
 import { openStore, type Data } from './data';
@@ -9,10 +10,11 @@ export async function saveImportedPlan(
   confirmed: boolean,
   dbName?: string,
 ) {
-  const next =
+  let next =
     'schemaVersion' in draft
       ? applyProgram(current, draft, confirmed)
       : applyImportedPlan(current, draft, confirmed);
+  if (current.streak) next = syncStreaks(next);
   const db = await openStore(dbName);
   try {
     const tx = db.transaction(['state', 'backups'], 'readwrite');

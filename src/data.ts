@@ -1,3 +1,4 @@
+import { assertStreak, mergeStreaks, syncStreaks, type StreakState } from './streak';
 import { assertLibrary, migratePrograms, mergePrograms, type SavedProgram } from './programs';
 import { assertProgram, type TrainingProgram } from './importing/model';
 import { ensureController, finishController, type WorkoutController } from './controller';
@@ -36,6 +37,11 @@ export interface Exercise {
   sets: SetEntry[];
 }
 export interface Workout {
+  streakExcluded?: boolean;
+  isTest?: boolean;
+  cancelled?: boolean;
+  abandoned?: boolean;
+  status?: string;
   programId?: string;
   displayName?: string;
   cycleWeek?: number;
@@ -50,6 +56,7 @@ export interface Workout {
   exercises: Exercise[];
 }
 export interface Data {
+  streak?: StreakState;
   programs?: SavedProgram[];
   activeProgramId?: string;
   programLibraryVersion?: 1;
@@ -122,6 +129,7 @@ export function parseData(input: unknown): Data {
     throw Error('Invalid workout plan.');
   if (d.trainingProgram) assertProgram(d.trainingProgram);
   assertLibrary(d);
+  if (d.streak !== undefined) assertStreak(d.streak);
   if (
     d.rotation &&
     (!Array.isArray(d.rotation.weeks) ||
@@ -255,15 +263,39 @@ export function mergeBackup(current: Data, incoming: Data): Data {
   if (current.active && incoming.active && content(current.active) !== content(incoming.active)) {
     append(incoming.active);
   }
-  return {
+  const projection = mergePrograms(current, incoming);
+  const streak = mergeStreaks(current.streak, incoming.streak);
+  // A conflicting restored program gets a new library ID. Carry its explicit target to that ID,
+  // while keeping the resident program's independent target and all historical snapshots.
+  if (streak && incoming.streak) {
+    const content = (p: SavedProgram) =>
+      JSON.stringify({ ...p, id: undefined, position: undefined });
+    for (const source of incoming.programs || []) {
+      const resident = projection.programs?.find((p) => p.id === source.id);
+      if (!resident || content(resident) === content(source)) continue;
+      const restored = projection.programs?.find(
+        (p) => p.id.startsWith(`${source.id}-restored-`) && content(p) === content(source),
+      );
+      const target = incoming.streak.targets[source.id];
+      if (restored && target !== undefined) {
+        streak.targets[restored.id] = target;
+        if (current.streak?.targets[source.id] !== undefined)
+          streak.targets[source.id] = current.streak.targets[source.id];
+        else delete streak.targets[source.id];
+      }
+    }
+  }
+  const next: Data = {
     ...current,
     ...incoming,
-    ...mergePrograms(current, incoming),
+    ...projection,
+    streak,
     active,
     history: history.sort((a, b) => b.started - a.started),
     week: incoming.week,
     restDefault: incoming.restDefault,
   };
+  return next.streak ? syncStreaks(next) : next;
 }
 export async function restoreBackup(current: Data, input: unknown, name?: string) {
   const incoming = parseData(input);
