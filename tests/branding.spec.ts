@@ -57,7 +57,7 @@ for (const [width, height] of [
     expect(rects[0].x).toBeGreaterThanOrEqual(0);
     expect(rects.at(-1)!.right).toBeLessThanOrEqual(width);
     expect((await header.boundingBox())!.height).toBeLessThanOrEqual(
-      (await page.locator('.streak-indicator').count()) ? 60 : 48,
+      (await page.locator('.streak-indicator').count()) ? 80 : 48,
     );
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,

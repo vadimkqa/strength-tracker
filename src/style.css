@@ -2151,20 +2151,29 @@ main.home-screen {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 64px;
-  gap: 4px;
-  padding-bottom: 10px;
+  grid-template-rows: auto auto;
+  column-gap: 4px;
+  row-gap: 8px;
+  padding-block: 6px;
+  margin-bottom: 20px;
   align-items: center;
 }
 .streak-home-header .brand {
+  grid-column: 1;
+  grid-row: 1 / span 2;
   gap: 6px;
 }
 .streak-home-header .edition {
-  position: absolute;
-  right: 3px;
-  bottom: 0;
+  grid-column: 2;
+  grid-row: 2;
+  justify-self: center;
   font-size: 9px;
   line-height: 10px;
   margin: 0;
+}
+.streak-home-header .streak-indicator {
+  grid-column: 2;
+  grid-row: 1;
 }
 .streak-indicator {
   display: flex;
