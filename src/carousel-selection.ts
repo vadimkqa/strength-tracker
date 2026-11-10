@@ -1,11 +1,16 @@
 import type { Data } from './data';
 import { carouselWorkouts } from './workouts';
+import { currentProgram } from './programs';
 export function carouselIndex(data: Data) {
   return Math.max(
     0,
-    carouselWorkouts(data.rotation, data.rotationWeek, data.trainingProgram, data.week).findIndex(
-      (w) => w.key === data.carouselWorkout,
-    ),
+    carouselWorkouts(
+      data.rotation,
+      data.rotationWeek,
+      data.trainingProgram,
+      data.week,
+      currentProgram(data)?.calendar?.days,
+    ).findIndex((w) => w.key === data.carouselWorkout),
   );
 }
 export function chooseWorkout(data: Data, index: number, wrap: -1 | 0 | 1 = 0): Data {
@@ -14,18 +19,23 @@ export function chooseWorkout(data: Data, index: number, wrap: -1 | 0 | 1 = 0): 
   const weeks = [
     ...new Set(
       data.trainingProgram
-        ? data.trainingProgram.rotation?.weeks || [
-            ...new Set(data.trainingProgram.workouts.map((w) => w.week)),
-          ]
+        ? data.trainingProgram.rotation?.weeks ||
+            [...new Set(data.trainingProgram.workouts.map((w) => w.week))].sort((a, b) => a - b)
         : data.rotation?.weeks || [1, 2],
     ),
-  ].sort((a, b) => a - b);
+  ];
   const weekIndex = Math.max(0, weeks.indexOf(data.rotationWeek || weeks[0]));
   const week =
     (data.trainingProgram || data.rotation) && wrap
       ? weeks[(weekIndex + wrap + weeks.length) % weeks.length]
       : data.rotationWeek;
-  const cards = carouselWorkouts(data.rotation, week, data.trainingProgram, data.week);
+  const cards = carouselWorkouts(
+    data.rotation,
+    week,
+    data.trainingProgram,
+    data.week,
+    currentProgram(data)?.calendar?.days,
+  );
   const target =
     wrap === -1 ? cards.length - 1 : wrap === 1 ? 0 : Math.min(index, cards.length - 1);
   if (!cards[target]) return data;
@@ -41,9 +51,13 @@ export function chooseWeek(data: Data, week: number): Data {
     ...data,
     carouselWorkout:
       data.carouselWorkout ||
-      carouselWorkouts(data.rotation, data.rotationWeek, data.trainingProgram, data.week)[
-        carouselIndex(data)
-      ].key,
+      carouselWorkouts(
+        data.rotation,
+        data.rotationWeek,
+        data.trainingProgram,
+        data.week,
+        currentProgram(data)?.calendar?.days,
+      )[carouselIndex(data)].key,
     rotationWeek: week,
     difficultyOverride: undefined,
   };
@@ -51,9 +65,13 @@ export function chooseWeek(data: Data, week: number): Data {
 export function workoutDifficulty(data: Data, index = carouselIndex(data)) {
   if (['built-in', 'legacy-txt'].includes(data.trainingProgram?.source.format || ''))
     return data.week;
-  const card = carouselWorkouts(data.rotation, data.rotationWeek, data.trainingProgram, data.week)[
-    index
-  ];
+  const card = carouselWorkouts(
+    data.rotation,
+    data.rotationWeek,
+    data.trainingProgram,
+    data.week,
+    currentProgram(data)?.calendar?.days,
+  )[index];
   const session = data.trainingProgram?.workouts.find((w) => w.id === card?.templateKey);
   if (session)
     return data.difficultyOverride?.key === session.id

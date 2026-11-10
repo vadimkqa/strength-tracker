@@ -7,6 +7,14 @@ import {
   workoutStreakReason,
 } from './streak';
 import { initializeStreaks } from './streak-storage';
+import { CalendarSettings } from './CalendarSettings';
+import {
+  applyAutomaticSelection,
+  automaticSelectionKey,
+  calendarStatus,
+  matchesSuggestion,
+  suggestWorkout,
+} from './auto-selection';
 import { StreakIcon } from './StreakIcon';
 import { StreakDashboard } from './StreakDashboard';
 import { ExerciseCard } from './ExerciseCard';
@@ -92,6 +100,7 @@ function App() {
     [pending, setPending] = useState(0),
     [restoring, setRestoring] = useState(false);
   const committed = useRef<Data | null>(null),
+    automaticKey = useRef<string | null>(null),
     toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const current = useRef<Data | null>(null),
     queue = useRef(Promise.resolve()),
@@ -139,6 +148,9 @@ function App() {
       });
     } else void initialize();
     const timer = setInterval(() => setNow(Date.now()), 1000);
+    const refreshCalendar = () => setNow(Date.now());
+    document.addEventListener('visibilitychange', refreshCalendar);
+    window.addEventListener('pageshow', refreshCalendar);
     if ('serviceWorker' in navigator && import.meta.env.PROD) {
       navigator.serviceWorker
         .register(`${import.meta.env.BASE_URL}sw.js`)
@@ -147,6 +159,8 @@ function App() {
     return () => {
       alive = false;
       clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshCalendar);
+      window.removeEventListener('pageshow', refreshCalendar);
       release?.();
     };
   }, []);
@@ -160,6 +174,30 @@ function App() {
       change((d) => d);
   }, [now, pending]);
   useEffect(() => () => clearTimeout(toastTimer.current), []);
+  useEffect(() => {
+    // Only committed completions may affect suggestions. Leave manual choices alone until an event changes this key.
+    const saved = committed.current;
+    if (!saved || saved.active || current.current?.active || pending || error || restoring) return;
+    const key = automaticSelectionKey(saved, now);
+    if (automaticKey.current === key) return;
+    automaticKey.current = key;
+    const next = applyAutomaticSelection(saved, now);
+    if (
+      JSON.stringify([
+        next.rotationWeek,
+        next.carouselWorkout,
+        next.week,
+        next.difficultyOverride,
+      ]) !==
+      JSON.stringify([
+        saved.rotationWeek,
+        saved.carouselWorkout,
+        saved.week,
+        saved.difficultyOverride,
+      ])
+    )
+      change((d) => applyAutomaticSelection(d, now, saved.history));
+  }, [now, savedData, pending, error, restoring]);
   function acceptSaved(d: Data, animate = true) {
     const previous = committed.current;
     committed.current = d;
@@ -302,7 +340,13 @@ function App() {
           )
             records.set(e.name, { weight: Number(s.weight), reps: Number(s.reps) });
         }
-  const cards = carouselWorkouts(data.rotation, data.rotationWeek, data.trainingProgram, data.week);
+  const cards = carouselWorkouts(
+    data.rotation,
+    data.rotationWeek,
+    data.trainingProgram,
+    data.week,
+    currentProgram(data)?.calendar?.days,
+  );
   const index = carouselIndex(data);
   const programTemplate = data.trainingProgram?.workouts.find(
     (w) => w.id === cards[index]?.templateKey,
@@ -318,6 +362,8 @@ function App() {
         (s) => s.week === (data.rotationWeek || 1) && s.workout === cards[index]?.key,
       );
   const selectedIntensity = workoutDifficulty(data, index);
+  const suggestion = savedData ? suggestWorkout(savedData, now) : null;
+  const context = matchesSuggestion(data, suggestion) ? suggestion?.kind : null;
   const streakReport = savedData ? calculateStreak(savedData, now) : null;
   const streakLevel = levelFor(streakReport?.current || 0);
   const celebrating = STREAK_LEVELS.find((l) => l.id === celebration);
@@ -400,7 +446,20 @@ function App() {
                       </div>
                     </div>
                   )}
+                  {(context || calendarStatus(data)) && (
+                    <p
+                      className="calendar-context"
+                      role="status"
+                      title={calendarStatus(data) || undefined}
+                    >
+                      {context ||
+                        (currentProgram(data)?.calendar?.enabled === false
+                          ? 'Calendar selection off'
+                          : 'Calendar selection needs setup in Settings')}
+                    </p>
+                  )}
                   <WorkoutCarousel
+                    dayOverrides={currentProgram(data)?.calendar?.days}
                     ref={carousel}
                     selected={index}
                     onSelect={(i, wrap = 0) => change((d) => chooseWorkout(d, i, wrap))}
@@ -489,6 +548,9 @@ function App() {
                                 d.history,
                               )),
                           programId: d.activeProgramId,
+                          ...(matchesSuggestion(d, suggestion)
+                            ? { scheduledFor: suggestion!.date }
+                            : {}),
                         },
                       }))
                     }
@@ -797,6 +859,7 @@ function App() {
             <BackupPanel data={data} ready={!pending && !restoring} onRestore={importData} />
             <PlanImporter onApply={applyPlan} />
             <ProgramEditor data={data} change={change} />
+            <CalendarSettings data={data} change={change} />
             <section className="card">
               <h2>Rest preferences</h2>
               <label htmlFor="default-rest">DEFAULT REST FOR NEW EXERCISES</label>

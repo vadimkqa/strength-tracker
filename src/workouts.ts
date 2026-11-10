@@ -1,4 +1,5 @@
 import type { TrainingProgram } from './importing/model';
+import { weekdayNumber, WEEKDAYS } from './calendar';
 // Stable IDs keep existing templates and history compatible with v1.
 export const workouts = [
   {
@@ -61,11 +62,8 @@ export function rotationKey(workout: WorkoutId, week: number, day: string, inten
 }
 
 // Sort the presentation only; stable workout/template IDs and source sessions stay intact.
-const weekdays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 function weekdayIndex(day: string) {
-  const normalized = day.trim().toLowerCase();
-  const index = weekdays.findIndex((d) => normalized === d || normalized === d.slice(0, 3));
-  return index < 0 ? 7 : index;
+  return weekdayNumber(day) ?? 7;
 }
 export interface WorkoutCard {
   key: string;
@@ -82,9 +80,14 @@ export function carouselWorkouts(
   week = 1,
   program?: TrainingProgram,
   preferredIntensity?: string,
+  dayOverrides?: Record<string, number>,
 ): WorkoutCard[] {
+  const assignedDay = (key: string, original: string | null) =>
+    dayOverrides?.[key] === undefined ? original : WEEKDAYS[dayOverrides[key]];
   if (program && !rotation) {
-    let templates = program.workouts.filter((w) => w.week === week);
+    let templates = program.workouts
+      .filter((w) => w.week === week)
+      .map((w) => ({ ...w, day: assignedDay(w.id, w.day) }));
     if (['legacy-txt', 'built-in'].includes(program.source.format)) {
       const slots = [...new Set(templates.map((w) => w.slotId))];
       templates = slots.map(
@@ -118,7 +121,10 @@ export function carouselWorkouts(
   if (rotation)
     return rotation.sessions
       .filter((s) => s.week === week)
-      .map((s) => ({ session: s, card: workouts.find((w) => w.key === s.workout) }))
+      .map((s) => ({
+        session: { ...s, day: assignedDay(s.key, s.day) || '' },
+        card: workouts.find((w) => w.key === s.workout),
+      }))
       .filter((item) => !!item.card)
       .sort((a, b) => weekdayIndex(a.session.day) - weekdayIndex(b.session.day))
       .map(({ session: s, card }) => ({

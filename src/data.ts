@@ -7,6 +7,7 @@ import type { SetPrescription } from './prescriptions';
 import type { Rotation } from './workouts';
 import { openDB } from 'idb';
 import { templateKey } from './workouts';
+import { validDate } from './calendar';
 import { defaultPlan, type Plan } from './templates';
 export const LEGACY_KEY = 'strength-tracker-v1';
 export interface SetEntry {
@@ -37,6 +38,7 @@ export interface Exercise {
   sets: SetEntry[];
 }
 export interface Workout {
+  scheduledFor?: string;
   streakExcluded?: boolean;
   isTest?: boolean;
   cancelled?: boolean;
@@ -86,6 +88,7 @@ function validWorkout(w: unknown): w is Workout {
     typeof x.id === 'string' &&
     typeof x.name === 'string' &&
     typeof x.started === 'number' &&
+    (x.scheduledFor === undefined || validDate(x.scheduledFor)) &&
     Array.isArray(x.exercises) &&
     x.exercises.every(
       (e) =>

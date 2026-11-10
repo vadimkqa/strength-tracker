@@ -4,7 +4,9 @@ import { assertProgram, stableId, type TrainingProgram } from './importing/model
 import { compileProgram } from './importing/compilation';
 import { workouts, templateLabel, type Rotation } from './workouts';
 import { exerciseIdentity } from './performance';
+import { assertCalendar, type CalendarConfig } from './calendar';
 export interface SavedProgram {
+  calendar?: CalendarConfig;
   kind?: 'built-in' | 'legacy';
   id: string;
   name: string;
@@ -282,6 +284,7 @@ export function assertLibrary(data: Data) {
     )
       throw Error('Invalid training-program library metadata.');
     ids.add(p.id);
+    if (p.calendar !== undefined) assertCalendar(p.calendar);
     if (p.program) assertProgram(p.program);
   }
 }
