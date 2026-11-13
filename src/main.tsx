@@ -15,7 +15,8 @@ import {
   matchesSuggestion,
   suggestWorkout,
 } from './auto-selection';
-import { StreakIcon } from './StreakIcon';
+import { StreakIcon, SecretStreakIcon } from './StreakIcon';
+import { artworkFor, secretUnlocked } from './streak-artwork';
 import { StreakDashboard } from './StreakDashboard';
 import { ExerciseCard } from './ExerciseCard';
 import { syncExerciseCards } from './exercise-cards';
@@ -207,8 +208,11 @@ function App() {
       (a) => a.valid && !previous.streak?.awards.some((old) => old.id === a.id && old.valid),
     );
     const newest = STREAK_LEVELS.filter((l) => fresh?.some((a) => a.id === l.id)).at(-1);
-    if (newest) {
-      setCelebration(newest.id);
+    const secretJustUnlocked =
+      secretUnlocked(calculateStreak(d).longest) &&
+      !secretUnlocked(calculateStreak(previous).longest);
+    if (newest || secretJustUnlocked) {
+      setCelebration(secretJustUnlocked ? 'secret' : newest!.id);
       clearTimeout(toastTimer.current);
       toastTimer.current = setTimeout(() => setCelebration(null), 6000);
     }
@@ -367,6 +371,7 @@ function App() {
   const streakReport = savedData ? calculateStreak(savedData, now) : null;
   const streakLevel = levelFor(streakReport?.current || 0);
   const celebrating = STREAK_LEVELS.find((l) => l.id === celebration);
+  const celebratingSecret = celebration === 'secret' && secretUnlocked(streakReport?.longest || 0);
   return (
     <>
       <main
@@ -880,12 +885,18 @@ function App() {
             <p className="footnote">STRENGTH TRAINER 2.0 · LOCAL FIRST</p>
           </>
         )}
-        {celebrating && !active && (
+        {(celebrating || celebratingSecret) && !active && (
           <aside className="streak-celebration" role="status">
-            <StreakIcon level={celebrating} />
+            {celebratingSecret ? (
+              <SecretStreakIcon longest={streakReport!.longest} />
+            ) : (
+              <StreakIcon level={celebrating!} />
+            )}
             <div>
               <small>ACHIEVEMENT UNLOCKED</small>
-              <strong>{celebrating.name}</strong>
+              <strong>
+                {celebratingSecret ? 'Secret achievement unlocked' : artworkFor(celebrating!).name}
+              </strong>
             </div>
             <button
               aria-label="View unlocked streak achievement"

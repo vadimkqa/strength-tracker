@@ -8,7 +8,13 @@ export default defineConfig({
       injectRegister: null,
       filename: 'sw.js',
       scope: '/strength-tracker/',
-      includeAssets: ['photos/*', 'icon-*.png', 'apple-touch-icon*.png', 'favicon*.png'],
+      includeAssets: [
+        'photos/*',
+        'icon-*.png',
+        'apple-touch-icon*.png',
+        'favicon*.png',
+        'streak-achievements/*.PNG',
+      ],
       manifest: {
         name: 'Strength Trainer 2.0',
         short_name: 'Strength',
