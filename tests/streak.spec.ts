@@ -79,7 +79,9 @@ test('never awards failed or pending saves; successful retry unlocks once and re
   await page.evaluate(() => ((window as any).blockStreakSave = false));
   await page.getByRole('button', { name: 'Retry saving', exact: true }).click();
   await expect(page.getByLabel('Current streak', { exact: true })).toHaveText('4 weeks');
-  await expect(page.locator('.streak-celebration')).toContainText('Strength dumbbell');
+  await expect(page.locator('.streak-celebration')).toContainText(
+    'Dumbbell with 2 plates per side',
+  );
   const saved = await stored(page);
   expect(saved.history).toHaveLength(seed.history.length + 1);
   expect(saved.streak.awards.filter((a: any) => a.id === 'growing' && a.valid)).toHaveLength(1);
@@ -130,7 +132,7 @@ test('unscheduled targets and timezone validation persist without changing the i
     .click();
   await expect(page.getByTestId('weekly-progress')).toHaveText('0 / 3');
 });
-test('Crystal collection uses distinct SVG art, remains earned through missed weeks and works offline', async ({
+test('Crystal collection uses original PNG art, remains earned through missed weeks and works offline', async ({
   page,
   context,
 }) => {
@@ -141,8 +143,13 @@ test('Crystal collection uses distinct SVG art, remains earned through missed we
     .click();
   const collection = page.getByLabel('Achievement evolution collection', { exact: true });
   await expect(collection.locator('article.unlocked')).toHaveCount(11);
-  await expect(collection.locator('article svg')).toHaveCount(11);
-  for (const material of ['Silver barbell', 'Gold barbell', 'Diamond barbell', 'Crystal barbell'])
+  await expect(collection.locator('article img')).toHaveCount(11);
+  for (const material of [
+    'Silver metallic barbell',
+    'Golden barbell',
+    'Diamond barbell',
+    'Purple crystal barbell',
+  ])
     await expect(collection.getByRole('img', { name: material, exact: true })).toHaveCount(1);
   await collection.scrollIntoViewIfNeeded();
   await collection.evaluate((el) => el.scrollIntoView({ block: 'start' }));

@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import type { Data } from './data';
 import { currentProgram, programWeeks } from './programs';
 import { STREAK_LEVELS, calculateStreak, levelFor, configureStreak, validTimeZone } from './streak';
-import { StreakIcon } from './StreakIcon';
+import { StreakIcon, SecretStreakIcon } from './StreakIcon';
+import { artworkFor, secretUnlocked, SECRET_WEEKS } from './streak-artwork';
 interface Props {
   data: Data;
   now: number;
@@ -28,7 +29,8 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
     [historyLimit, setHistoryLimit] = useState(12);
   useEffect(() => setCycle(cycle), [cycle, active?.id]);
   const level = levelFor(report.current),
-    next = STREAK_LEVELS.find((l) => l.weeks > report.longest);
+    next = STREAK_LEVELS.find((l) => l.weeks > report.longest),
+    secret = secretUnlocked(report.longest);
   return (
     <div
       className="streak-dashboard"
@@ -43,7 +45,7 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
       </div>
       <section className="card streak-hero" aria-label="Current Strength Streak">
         <StreakIcon level={level} />
-        <p className="eyebrow">{level.name}</p>
+        <p className="eyebrow">{artworkFor(level).name}</p>
         <strong className="streak-count" aria-label="Current streak">
           {report.current}
           <small>{report.current === 1 ? ' week' : ' weeks'}</small>
@@ -59,11 +61,12 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
             <progress
               max={next.weeks}
               value={report.current}
-              aria-label={`Progress toward ${next.name}`}
+              aria-label={`Progress toward ${artworkFor(next).name}`}
             />
             <p className="muted">
               {next.weeks - report.current} more successful{' '}
-              {next.weeks - report.current === 1 ? 'week' : 'weeks'} to {next.name} · {next.weeks}w
+              {next.weeks - report.current === 1 ? 'week' : 'weeks'} to {artworkFor(next).name} ·{' '}
+              {next.weeks}w
             </p>
           </>
         ) : (
@@ -215,16 +218,17 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
         <div className="achievement-collection">
           {STREAK_LEVELS.map((l) => {
             const award = s.awards.find((a) => a.id === l.id),
-              unlocked = l.weeks === 0 || !!award?.valid;
+              unlocked = l.weeks === 0 || !!award?.valid,
+              name = artworkFor(l).name;
             return (
               <article
                 key={l.id}
                 className={`achievement-tile ${unlocked ? 'unlocked' : 'locked'}`}
-                aria-label={`${l.name} · ${unlocked ? 'Unlocked' : 'Locked'}`}
-                title={award ? `Earned week ${award.earnedWeek}` : l.name}
+                aria-label={`${name} · ${unlocked ? 'Unlocked' : 'Locked'}`}
+                title={award ? `Earned week ${award.earnedWeek}` : name}
               >
                 <StreakIcon level={l} />
-                <h3>{l.name}</h3>
+                <h3>{name}</h3>
                 <span>{l.weeks ? `${l.weeks} weeks` : 'Starting equipment'}</span>
                 <small>
                   {unlocked
@@ -239,6 +243,20 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
             );
           })}
         </div>
+      </section>
+      <section
+        className={`card secret-achievement ${secret ? 'unlocked' : 'locked'}`}
+        aria-label="Secret achievement"
+        data-unlocked={secret}
+      >
+        <h2>Secret achievement</h2>
+        <SecretStreakIcon longest={report.longest} />
+        <p className="eyebrow">{secret ? 'UNLOCKED' : 'LOCKED'}</p>
+        <p className="muted">
+          {secret
+            ? 'Earned with a verified 52-week streak. Yours to keep after missed weeks.'
+            : `${SECRET_WEEKS} consecutive qualifying training weeks. The reward stays hidden until earned.`}
+        </p>
       </section>
       <section className="card streak-history" aria-label="Weekly streak history">
         <h2>Previous weeks</h2>
