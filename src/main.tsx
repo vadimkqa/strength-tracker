@@ -403,8 +403,13 @@ function App() {
               aria-label={`Strength Streak, ${streakReport?.current || 0} consecutive ${streakReport?.current === 1 ? 'week' : 'weeks'}`}
               onClick={showStreak}
             >
-              <StreakIcon level={streakLevel} />
-              <strong>{streakReport?.current || 0}w</strong>
+              <span className="streak-badge-art">
+                <StreakIcon level={streakLevel} />
+              </span>
+              <strong>
+                {streakReport?.current || 0}
+                <small>w</small>
+              </strong>
             </button>
           )}
         </header>
