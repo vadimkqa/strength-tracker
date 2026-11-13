@@ -54,6 +54,7 @@ for (const [width, height] of [
     if (width === 390) await page.screenshot({ path: 'test-results/approved-streak-home.png' });
     await details(page);
     await imagesLoaded(page);
+    if (width === 390) await page.screenshot({ path: 'test-results/polished-streak-main.png' });
     const collection = page.getByLabel('Achievement evolution collection', { exact: true });
     await expect(collection.locator('article')).toHaveCount(11);
     await expect(collection.locator('svg')).toHaveCount(0);

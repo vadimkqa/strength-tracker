@@ -44,33 +44,42 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
         <p>Monday–Sunday · {s.timeZone}</p>
       </div>
       <section className="card streak-hero" aria-label="Current Strength Streak">
-        <StreakIcon level={level} />
-        <p className="eyebrow">{artworkFor(level).name}</p>
+        <div
+          className="streak-art-frame"
+          data-shape={['basic', 'first-plates', 'growing'].includes(level.id) ? 'square' : 'wide'}
+        >
+          <StreakIcon level={level} />
+        </div>
+        <h2 className="streak-achievement-name">{artworkFor(level).name}</h2>
         <strong className="streak-count" aria-label="Current streak">
           {report.current}
           <small>{report.current === 1 ? ' week' : ' weeks'}</small>
         </strong>
-        <p className="muted">
-          Longest verified streak:{' '}
+        <p className="streak-longest">
+          <span>Longest verified streak</span>
           <b data-testid="longest-streak">
             {report.longest} {report.longest === 1 ? 'week' : 'weeks'}
           </b>
         </p>
         {next ? (
-          <>
+          <div className="streak-next">
+            <div className="streak-next-heading">
+              <span>Next milestone</span>
+              <span className="streak-next-target">{next.weeks}w</span>
+            </div>
             <progress
               max={next.weeks}
               value={report.current}
               aria-label={`Progress toward ${artworkFor(next).name}`}
             />
-            <p className="muted">
-              {next.weeks - report.current} more successful{' '}
-              {next.weeks - report.current === 1 ? 'week' : 'weeks'} to {artworkFor(next).name} ·{' '}
-              {next.weeks}w
+            <p className="streak-next-name">{artworkFor(next).name}</p>
+            <p className="streak-next-copy">
+              {next.weeks - report.current} qualifying{' '}
+              {next.weeks - report.current === 1 ? 'week' : 'weeks'} to go
             </p>
-          </>
+          </div>
         ) : (
-          <p className="muted">All achievements are in your collection.</p>
+          <p className="streak-next-copy">All achievements are in your collection.</p>
         )}
       </section>
       <section className="card" aria-label="This week's streak progress">
