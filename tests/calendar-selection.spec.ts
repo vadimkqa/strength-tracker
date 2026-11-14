@@ -248,13 +248,13 @@ test('a successful Finish save advances the suggestion; a failed save cannot adv
   await page.getByRole('button', { name: 'FINISH WORKOUT', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Changes are not saved');
   await page.getByRole('button', { name: 'Train', exact: true }).click();
-  await expect(page.locator('.stack-front')).toHaveAttribute('aria-label', 'Upper');
-  await expect(page.getByLabel('TRAINING ROTATION', { exact: true })).toHaveAttribute(
-    'data-week',
-    '1',
-  );
+  await expect(page.locator('.workout-controller')).toBeVisible();
+  await expect(page.locator('.stack-front')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Workout Complete', exact: true })).toHaveCount(0);
   await page.evaluate(() => ((window as any).failCalendarSave = false));
   await page.getByRole('button', { name: 'Retry saving', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Workout Complete', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(page.locator('.stack-front')).toHaveAttribute('aria-label', 'Lower');
   await expect(page.getByLabel('TRAINING ROTATION', { exact: true })).toHaveAttribute(
     'data-week',

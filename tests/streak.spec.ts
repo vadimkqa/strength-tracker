@@ -80,10 +80,9 @@ test('never awards failed or pending saves; successful retry unlocks once and re
   await expect(page.locator('.streak-celebration')).toHaveCount(0);
   await page.evaluate(() => ((window as any).blockStreakSave = false));
   await page.getByRole('button', { name: 'Retry saving', exact: true }).click();
-  await expect(page.getByLabel('Current streak', { exact: true })).toHaveText('4 weeks');
-  await expect(page.locator('.streak-celebration')).toContainText(
-    'Dumbbell with 2 plates per side',
-  );
+  await expect(page.getByRole('heading', { name: 'Workout Complete', exact: true })).toBeVisible();
+  await expect(page.locator('.completion-week-success')).toContainText('4 weeks');
+  await expect(page.locator('.completion-unlock')).toContainText('Dumbbell with 2 plates per side');
   const saved = await stored(page);
   expect(saved.history).toHaveLength(seed.history.length + 1);
   expect(saved.streak.awards.filter((a: any) => a.id === 'growing' && a.valid)).toHaveLength(1);
