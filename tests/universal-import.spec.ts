@@ -159,7 +159,7 @@ test('uploaded five-day plan is reviewed explicitly, preserves source cutoff, an
       .selectOption({ label: workout });
     for (const row of await preview.locator('.review-exercise').all()) {
       await row.locator('summary').first().click();
-      await row.getByRole('checkbox').first().check();
+      for (const issue of await row.getByRole('checkbox').all()) await issue.check();
     }
   }
   await preview

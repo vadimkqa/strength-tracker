@@ -120,8 +120,7 @@ export function programProblems(program: TrainingProgram): string[] {
     }
   }
   const unresolved = programIssues(program).filter((i) => !i.reviewed);
-  if (unresolved.length)
-    errors.push(`Review ${unresolved.length} unresolved source or missing-information warnings.`);
+  if (unresolved.length) errors.push(`Review ${unresolved.length} unresolved source ambiguities.`);
   return [...new Set(errors)];
 }
 /** Structural validation for backups; does not require warnings to be resolved again. */

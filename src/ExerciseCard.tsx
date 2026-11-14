@@ -382,6 +382,17 @@ export function ExerciseCard({ workout: w, exercise: e, change, sort }: Props) {
               − Remove set
             </button>
             <button
+              type="button"
+              className="keyboard-dismiss"
+              aria-label={`Done editing ${e.name}`}
+              onPointerDown={(event) => event.preventDefault()}
+              onClick={() => {
+                if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+              }}
+            >
+              Done editing
+            </button>
+            <button
               aria-label={`Add set to ${e.name}`}
               disabled={e.sets.length >= 12}
               onClick={() =>

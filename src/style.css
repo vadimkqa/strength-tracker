@@ -1513,11 +1513,9 @@ main.active-workout {
 @keyframes workout-panel-enter {
   from {
     opacity: 0.6;
-    transform: translateX(6px);
   }
   to {
     opacity: 1;
-    transform: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1622,17 +1620,18 @@ summary,
 .timer-bubble {
   touch-action: none;
 }
+/* One document scroller and native fixed anchoring. Keyboard geometry must never resize padding. */
 nav[aria-label='Main navigation'] {
-  bottom: var(--keyboard-offset, 0px);
-}
-.workout-floating-action {
-  bottom: calc(88px + env(safe-area-inset-bottom) + var(--keyboard-offset, 0px));
+  bottom: 0;
 }
 main.active-workout {
-  padding-bottom: calc(190px + env(safe-area-inset-bottom) + var(--keyboard-offset, 0px));
+  /* The base main uses hidden overflow; never let Safari focus-scroll it separately. */
+  overflow-x: clip;
+  overflow-y: visible;
+  padding-bottom: calc(100px + env(safe-area-inset-bottom));
 }
 main:not(.active-workout) {
-  padding-bottom: calc(100px + env(safe-area-inset-bottom) + var(--keyboard-offset, 0px));
+  padding-bottom: calc(100px + env(safe-area-inset-bottom));
 }
 @supports (-webkit-touch-callout: none) {
   input,
@@ -1801,9 +1800,10 @@ main.active-workout {
 .exercise-collapse.expanded {
   grid-template-rows: 1fr;
 }
+/* Clip the collapse animation without creating a nested focus-scroll container. */
 .exercise-content {
   min-height: 0;
-  overflow: hidden;
+  overflow: clip;
 }
 .exercise-collapse:not(.expanded) .exercise-content {
   visibility: hidden;
@@ -1853,7 +1853,7 @@ main.active-workout {
   padding: 8px 4px;
   font-size: 16px;
   scroll-margin-top: calc(12px + env(safe-area-inset-top));
-  scroll-margin-bottom: 190px;
+  scroll-margin-bottom: 8px;
 }
 .exercise-card .set-input:focus {
   outline: 0;
@@ -1956,34 +1956,31 @@ main.active-workout {
   width: 44px;
   min-height: 44px;
 }
-html[data-workout-keyboard='true'] nav[aria-label='Main navigation'] {
+/* During editing there are no fixed overlays in the visible typing area. The shared
+   controller remains in normal document flow and returns to floating after dismissal. */
+html[data-workout-keyboard='true'] nav[aria-label='Main navigation'],
+html[data-workout-keyboard='true'] .timer-bubble {
   visibility: hidden;
   pointer-events: none;
 }
 html[data-workout-keyboard='true'] .workout-floating-action {
-  bottom: calc(var(--keyboard-offset, 0px) + 8px);
-  left: 12px;
-  right: 12px;
-}
-html[data-workout-keyboard='true'] .workout-floating-action button {
-  min-height: 44px;
-  height: 44px;
-}
-html[data-workout-keyboard='true'] .timer-bubble {
-  width: 56px;
-  height: 56px;
-  min-height: 56px;
-  gap: 3px;
-  padding: 5px 2px;
-}
-html[data-workout-keyboard='true'] .bubble-elapsed {
-  font-size: 14px;
-}
-html[data-workout-keyboard='true'] .bubble-phase {
-  font-size: 8px;
+  position: static;
+  margin: 0;
+  max-width: none;
 }
 html[data-workout-keyboard='true'] .exercise-collapse {
   transition: none;
+}
+.keyboard-dismiss {
+  display: none;
+}
+html[data-workout-keyboard='true'] .exercise-card:focus-within .keyboard-dismiss {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  min-height: 44px;
+  color: var(--highlight);
+  background: transparent;
 }
 @media (prefers-reduced-motion: reduce) {
   .exercise-collapse,
@@ -3114,4 +3111,20 @@ main.home-screen {
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* Reserve the controller's own footprint, not the keyboard's height. Switching
+   between fixed and in-flow presentation must not change the document length. */
+.workout-action-slot {
+  display: flow-root;
+  min-height: 86px;
+  padding: 16px 0;
+}
+
+/* Native focus scrolling must not reserve the hidden navigation/controller again. */
+html[data-workout-keyboard='true'] {
+  scroll-padding-bottom: 8px;
+}
+html[data-workout-keyboard='true'] .live-set-controls button {
+  scroll-margin-block: 8px;
 }

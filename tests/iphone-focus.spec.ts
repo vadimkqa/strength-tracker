@@ -45,55 +45,54 @@ for (const [width, height] of [
         .evaluate((e) => getComputedStyle(e).touchAction),
     ).toBe('manipulation');
     expect(
-      await page
-        .getByRole('button', { name: 'Move floating timer' })
-        .evaluate((e) => getComputedStyle(e).touchAction),
+      await page.locator('.timer-bubble').evaluate((e) => getComputedStyle(e).touchAction),
     ).toBe('none');
   });
-test('focused keyboard viewport moves fixed controls above keyboard, then resets without restricting pinch zoom', async ({
+test('editing uses native document flow instead of moving fixed chrome by a keyboard offset', async ({
   page,
 }) => {
   await page.goto('/strength-tracker/');
   await page.getByRole('button', { name: 'START WORKOUT' }).click();
-  await page.getByLabel('Weight Bench Press set 1', { exact: true }).focus();
+  const field = page.getByLabel('Weight Bench Press set 1', { exact: true });
+  await field.focus();
   await page.evaluate(() => {
-    const vv = visualViewport!;
-    Object.defineProperty(vv, 'height', { configurable: true, value: innerHeight - 300 });
-    Object.defineProperty(vv, 'offsetTop', { configurable: true, value: 20 });
-    vv.dispatchEvent(new Event('resize'));
+    Object.defineProperty(visualViewport!, 'height', {
+      configurable: true,
+      value: innerHeight - 300,
+    });
+    Object.defineProperty(visualViewport!, 'offsetTop', { configurable: true, value: 20 });
+    visualViewport!.dispatchEvent(new Event('resize'));
   });
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        getComputedStyle(document.documentElement).getPropertyValue('--keyboard-offset'),
-      ),
-    )
-    .toBe('280px');
+  await expect(page.locator('html')).toHaveAttribute('data-workout-keyboard', 'true');
   await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeHidden();
-  const action = await page.getByRole('button', { name: 'START SET', exact: true }).boundingBox(),
-    bubble = await page.getByRole('button', { name: 'Move floating timer' }).boundingBox();
-  expect(action!.y + action!.height).toBeLessThanOrEqual(844 - 280);
-  expect(bubble!.y + bubble!.height).toBeLessThan(action!.y);
+  await expect(page.locator('.timer-bubble')).toBeHidden();
+  expect(
+    await page.locator('.workout-floating-action').evaluate((e) => getComputedStyle(e).position),
+  ).toBe('static');
+  expect(
+    await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--keyboard-offset'),
+    ),
+  ).toBe('');
   await page.evaluate(() => {
     Object.defineProperty(visualViewport!, 'scale', { configurable: true, value: 1.5 });
     visualViewport!.dispatchEvent(new Event('resize'));
   });
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        getComputedStyle(document.documentElement).getPropertyValue('--keyboard-offset'),
-      ),
-    )
-    .toBe('0px');
+  expect(await page.locator('meta[name=viewport]').getAttribute('content')).not.toMatch(
+    /maximum-scale|user-scalable\s*=\s*no/,
+  );
+  await page.getByRole('button', { name: 'Done editing Bench Press', exact: true }).click();
   await page.evaluate(() => {
+    Object.defineProperty(visualViewport!, 'height', { configurable: true, value: innerHeight });
     Object.defineProperty(visualViewport!, 'scale', { configurable: true, value: 1 });
-    (document.activeElement as HTMLElement).blur();
+    Object.defineProperty(visualViewport!, 'offsetTop', { configurable: true, value: 0 });
+    visualViewport!.dispatchEvent(new Event('resize'));
   });
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        getComputedStyle(document.documentElement).getPropertyValue('--keyboard-offset'),
-      ),
-    )
-    .toBe('0px');
+  await expect(page.locator('html')).not.toHaveAttribute('data-workout-keyboard', 'true');
+  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
+  expect(
+    await page
+      .getByRole('navigation', { name: 'Main navigation' })
+      .evaluate((e) => getComputedStyle(e).bottom),
+  ).toBe('0px');
 });

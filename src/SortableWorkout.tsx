@@ -15,6 +15,24 @@ import { CSS } from '@dnd-kit/utilities';
 import type { Exercise, Workout } from './data';
 import { ExerciseCard } from './ExerciseCard';
 import { reorderExercises } from './reorder-exercises';
+// Refuse activation while typing/dismissing the keyboard; preserve native header scrolling.
+const editing = () =>
+  document.documentElement.dataset.workoutKeyboard === 'true' ||
+  !!document.activeElement?.matches(
+    'input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=button]):not([type=submit]),textarea,select,[contenteditable=true]',
+  );
+class WorkoutTouchSensor extends TouchSensor {
+  static activators: typeof TouchSensor.activators = TouchSensor.activators.map((a) => ({
+    ...a,
+    handler: (event, options) => !editing() && a.handler(event, options),
+  }));
+}
+class WorkoutMouseSensor extends MouseSensor {
+  static activators: typeof MouseSensor.activators = MouseSensor.activators.map((a) => ({
+    ...a,
+    handler: (event, options) => !editing() && a.handler(event, options),
+  }));
+}
 export interface ExerciseSortControls {
   attributes: DraggableAttributes;
   listeners: DraggableSyntheticListeners;
@@ -41,8 +59,8 @@ export function SortableWorkout({
   children: ReactNode;
 }) {
   const sensors = useSensors(
-    useSensor(TouchSensor, { activationConstraint: { delay: 450, tolerance: 8 } }),
-    useSensor(MouseSensor, { activationConstraint: { delay: 300, tolerance: 6 } }),
+    useSensor(WorkoutTouchSensor, { activationConstraint: { delay: 450, tolerance: 8 } }),
+    useSensor(WorkoutMouseSensor, { activationConstraint: { delay: 300, tolerance: 6 } }),
   );
   const [message, setMessage] = useState('');
   const source = useRef(workout.id);
@@ -68,7 +86,7 @@ export function SortableWorkout({
       accessibility={{
         screenReaderInstructions: {
           draggable:
-            'Press and hold the exercise title to drag. Use Move up or Move down in Set options for keyboard reordering. Escape cancels dragging.',
+            'Finish editing first, then press and hold the exercise title to drag. Use Move up or Move down in Set options for keyboard reordering. Escape cancels dragging.',
         },
         announcements: {
           onDragStart: ({ active }) =>

@@ -100,6 +100,13 @@ export function PlanImporter({ onApply }: Props) {
       // Unknown workout headings go through the independent program parser, never forced onto four IDs.
       const legacy =
         result.rows.length > 0 &&
+        result.rows.every(
+          (r) =>
+            r.intensity &&
+            (r.allowUnspecifiedSets || r.sets !== null) &&
+            (r.allowUnspecifiedRest || r.rest !== null) &&
+            (r.allowUnspecifiedReps || r.reps || r.setPrescriptions.length),
+        ) &&
         (aliases.trim() || /\b(?:Bench Day|DB Press|Hammer Press|Leg Day)\b/i.test(source)) &&
         (result.rows.every((r) => r.workout) ||
           result.rows.filter((r) => r.workout).length / result.rows.length > 0.8);
@@ -336,7 +343,7 @@ export function PlanImporter({ onApply }: Props) {
                       {index + 1}. {row.name || 'Unnamed exercise'}
                     </strong>
                     <span>
-                      {row.exerciseIntensity || 'Intensity unspecified'}
+                      {row.exerciseIntensity || ''}
                       {row.optional ? ' · Optional' : ''}
                       {row.kind === 'core' ? ' · Core' : ''}
                     </span>

@@ -70,7 +70,7 @@ function parseExercise(
   const cut = [
     mx?.index,
     sets?.index,
-    stripped.search(/\b(?:rest|RPE|RIR)\b|\d+\s*reps?\b|@\s*\d/i),
+    stripped.search(/\b(?:rest|RPE|RIR)\b|\d+(?:\s*[-–—]\s*\d+)?\s*reps?\b|@\s*\d/i),
   ].filter((i): i is number => i !== undefined && i >= 0);
   const prefix = (cut.length ? stripped.slice(0, Math.min(...cut)) : stripped).replace(
     /[\s:;|–—-]+$/,
@@ -84,13 +84,16 @@ function parseExercise(
     target.minReps = r ? Number(r[1]) : null;
     target.maxReps = r ? Number(r[2] || r[1]) : null;
   }
+  const labels = [...prefix.matchAll(/\b(HARD|HEAVY|EASY|MID)\b/gi)].map((m) =>
+    m[1].toUpperCase().replace('HEAVY', 'HARD'),
+  );
   const alternatives = name.split(/\s+(?:or|\/)\s+/i);
   const e: ProgramExercise = {
     id: `entry-${stableId(name + ref.line + order)}`,
     identity: exerciseIdentity(name),
     name,
     order,
-    intensity: intensity(prefix),
+    intensity: new Set(labels).size > 1 ? null : intensity(prefix),
     setCount: count && count <= 100 ? count : null,
     defaultTarget: target,
     sets:
@@ -104,16 +107,44 @@ function parseExercise(
     source: [ref],
     issues: [],
   };
-  if (count !== null && count > 100)
-    e.issues.push(issue('Set count exceeds 100. Review this prescription.', ref));
-  if (!count)
-    e.issues.push(issue('Set count is unspecified. Review and keep unset or enter it.', ref));
-  if (target.minReps === null && !target.repsText)
-    e.issues.push(issue('Target reps are unspecified. Review and keep unset or enter them.', ref));
-  if (target.restSeconds === null)
-    e.issues.push(issue('Rest is unspecified; no rest duration was inferred.', ref));
-  if (/\brest\b/i.test(stripped) && target.restSeconds === null)
+  if (new Set(labels).size > 1)
+    e.issues.push(issue('Conflicting exercise intensity labels. Review the original source.', ref));
+  if (count !== null && (count < 1 || count > 100))
+    e.issues.push(issue('Set count is outside 1–100. Review this prescription.', ref));
+  if (
+    /\brest\b/i.test(stripped) &&
+    target.restSeconds === null &&
+    !/\brest\s*[:=]?\s*(?:as needed|unspecified|not specified|self.selected|optional)\b/i.test(
+      stripped,
+    )
+  )
     e.issues.push(issue('Rest expression could not be interpreted. See source.', ref));
+  if (
+    [...stripped.matchAll(/\brest\b/gi)].length > 1 ||
+    /\brest\b.*\bor\b.*\d+\s*(?:s|sec|min)\b/i.test(stripped)
+  ) {
+    e.sets.forEach((s) => (s.restSeconds = null));
+    if (e.defaultTarget) e.defaultTarget.restSeconds = null;
+    e.issues.push(issue('Multiple rest choices require review; no duration was selected.', ref));
+  }
+  for (const key of ['rpe', 'rir'] as const) {
+    const expression = new RegExp(`\\b${key}\\b`, 'gi');
+    const matches = [...stripped.matchAll(expression)];
+    if (
+      matches.length > 1 ||
+      (matches.length &&
+        target[key] === null &&
+        !new RegExp(`${key}\\s*[:=]?\\s*(?:unspecified|not specified)`, 'i').test(stripped))
+    ) {
+      e.sets.forEach((s) => (s[key] = null));
+      if (e.defaultTarget) e.defaultTarget[key] = null;
+      e.issues.push(
+        issue(`${key.toUpperCase()} expression requires review; no target was selected.`, ref),
+      );
+    }
+  }
+  if (/@\s*\d/.test(stripped) && !target.weight && !/\b(?:RPE|RIR)\s*@/i.test(stripped))
+    e.issues.push(issue('Target weight needs an explicit unit; review the source.', ref));
   const range = /\b\d+\s*[-–—]\s*\d+\s*(?:[x×]|sets?)/i.exec(stripped);
   const prescriptions = [...stripped.matchAll(/\b\d+\s*[x×]\s*(?:\d+|AMRAP)/gi)];
   if (range || prescriptions.length > 1) {
@@ -171,6 +202,15 @@ export function parseProgram(doc: ExtractedDocument): TrainingProgram {
     ref: SourceRef,
     sessionIntensity: string | null = null,
   ) {
+    const labels = [...name.matchAll(/\b(HARD|HEAVY|EASY|MID)\b/gi)].map((m) =>
+      m[1].toUpperCase().replace('HEAVY', 'HARD'),
+    );
+    if (new Set(labels).size > 1) {
+      sessionIntensity = null;
+      p.issues.push(
+        issue('Conflicting session intensity labels. Review the original source.', ref),
+      );
+    }
     const title = cleanIntensity(name) || day || '';
     const ordinal = p.workouts.filter((w) => w.week === week && w.name === title).length;
     const slotId = `slot-${stableId(title.toLowerCase() + ':' + ordinal)}`;
@@ -228,7 +268,15 @@ export function parseProgram(doc: ExtractedDocument): TrainingProgram {
       return;
     }
     if (/^(?:note|notes|warning|instructions|progression|rest days?)\b/i.test(value)) {
-      unsupported(value, ref);
+      if (/^warning\b|cut.?off|truncat|incomplete|ambig|contradict|unparseable/i.test(value))
+        unsupported(value, ref);
+      else {
+        const ex = current?.exercises.at(-1);
+        if (ex) {
+          ex.notes += '\n' + raw;
+          ex.source.push(ref);
+        } else current?.source.push(ref);
+      }
       return;
     }
     const dm = weekday.exec(value);
@@ -307,6 +355,7 @@ export function parseProgram(doc: ExtractedDocument): TrainingProgram {
         ) ||
         /^[A-F]\s*[:)]$/.test(value) ||
         /^#{1,6}\s/.test(value) ||
+        /\s(?:day|session)\s*$/i.test(value) ||
         /:$/.test(value));
     if (heading) {
       workout(value.replace(/^#{1,6}\s*/, '').replace(/:$/, ''), null, ref, intensity(value));

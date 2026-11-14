@@ -56,24 +56,17 @@ for (const [width, height] of [
       expect(after[i].x).toBeCloseTo(before[i].x, 1);
       expect(after[i].width).toBeCloseTo(before[i].width, 1);
     }
-    const action = page.getByRole('button', { name: 'START SET', exact: true }),
-      bubble = page.getByRole('button', { name: 'Move floating timer', exact: true });
+    const bubble = page.getByRole('button', { name: 'Move floating timer', exact: true });
+    await expect(bubble).toBeHidden();
+    expect(
+      await page.locator('.workout-floating-action').evaluate((e) => getComputedStyle(e).position),
+    ).toBe('static');
     await expect
       .poll(async () => {
-        const r = (await field.boundingBox())!,
-          button = (await action.boundingBox())!;
-        return r.y + r.height <= button.y - 10;
+        const r = (await field.boundingBox())!;
+        return r.y >= 28 && r.y + r.height <= height - 300 + 20 - 8;
       })
       .toBe(true);
-    const r = (await field.boundingBox())!,
-      b = (await bubble.boundingBox())!;
-    expect(r.y).toBeGreaterThanOrEqual(30);
-    expect(
-      b.x + b.width <= r.x ||
-        b.x >= r.x + r.width ||
-        b.y + b.height <= r.y ||
-        b.y >= r.y + r.height,
-    ).toBe(true);
     await field.fill('67.5');
     const scroll = await page.evaluate(() => scrollY);
     await page.getByLabel('Reps Bench Press set 1', { exact: true }).fill('9');
@@ -93,22 +86,19 @@ for (const [width, height] of [
       'aria-selected',
       'true',
     );
-    const old = (await bubble.boundingBox())!;
-    await page.mouse.move(old.x + old.width / 2, old.y + old.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(width - 70, 90, { steps: 10 });
-    await page.mouse.up();
-    await expect(page.getByRole('tab', { name: 'EXERCISES', exact: true })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
-    await field.blur();
+    await page.getByRole('button', { name: 'Done editing Bench Press', exact: true }).click();
     await page.evaluate(() => {
       Object.defineProperty(visualViewport!, 'height', { configurable: true, value: innerHeight });
       Object.defineProperty(visualViewport!, 'offsetTop', { configurable: true, value: 0 });
       visualViewport!.dispatchEvent(new Event('resize'));
     });
     await expect(page.locator('html')).not.toHaveAttribute('data-workout-keyboard', 'true');
+    await expect(bubble).toBeVisible();
+    const old = (await bubble.boundingBox())!;
+    await page.mouse.move(old.x + old.width / 2, old.y + old.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(width - 70, 90, { steps: 10 });
+    await page.mouse.up();
     await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
     await page.getByRole('button', { name: 'Expand Chest Dip', exact: true }).click();
     await expect(page.locator('.set-head:visible')).toHaveCount(2);

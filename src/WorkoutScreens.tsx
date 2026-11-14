@@ -173,27 +173,29 @@ export function WorkoutScreens({ workout: w, now, change, finish, children }: Pr
           }
         />
       )}
-      <div className="workout-floating-action">
-        <button
-          className="primary"
-          onClick={() => {
-            if (label === 'FINISH WORKOUT') {
-              finish();
-              return;
-            }
-            const time = Date.now();
-            if (time - busy.current < 650) return;
-            busy.current = time;
+      <div className="workout-action-slot">
+        <div className="workout-floating-action">
+          <button
+            className="primary"
+            onClick={() => {
+              if (label === 'FINISH WORKOUT') {
+                finish();
+                return;
+              }
+              const time = Date.now();
+              if (time - busy.current < 650) return;
+              busy.current = time;
 
-            if (label === 'COMPLETE LOGGING' || label === 'SELECT UNFINISHED SET') {
-              screen('exercises');
-              return;
-            }
-            change((w) => (w.controller!.phase === 'set' ? stopSet(w, time) : startSet(w, time)));
-          }}
-        >
-          {label}
-        </button>
+              if (label === 'COMPLETE LOGGING' || label === 'SELECT UNFINISHED SET') {
+                screen('exercises');
+                return;
+              }
+              change((w) => (w.controller!.phase === 'set' ? stopSet(w, time) : startSet(w, time)));
+            }}
+          >
+            {label}
+          </button>
+        </div>
       </div>
     </div>
   );
