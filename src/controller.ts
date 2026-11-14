@@ -132,7 +132,12 @@ export function stopSet(input: Workout, now = Date.now()) {
   );
   const index = all.findIndex((x) => x.setId === p.setId);
   const eligible = positions(w);
-  c.selected = all.slice(index + 1).find((x) => eligible.some((y) => y.setId === x.setId)) || null;
+  // Follow the current session order. Return to earlier unfinished rows only
+  // after reaching its end, so moving a card above a running set cannot strand it.
+  c.selected =
+    all.slice(index + 1).find((x) => eligible.some((y) => y.setId === x.setId)) ||
+    eligible[0] ||
+    null;
   return w;
 }
 export function skipSet(w: Workout, p: Position) {
@@ -147,7 +152,7 @@ export function skipSet(w: Workout, p: Position) {
   const i = all.findIndex((x) => x.setId === p.setId);
   const eligible = positions(w);
   w.controller!.selected =
-    all.slice(i + 1).find((x) => eligible.some((y) => y.setId === x.setId)) || null;
+    all.slice(i + 1).find((x) => eligible.some((y) => y.setId === x.setId)) || eligible[0] || null;
 }
 export function finishController(input: Workout, now = Date.now()) {
   const w = ensureController(input),
