@@ -9,6 +9,10 @@ export async function initializeStreaks(data: Data, zone: string, name?: string,
     try {
       if (!data.streak)
         await tx.objectStore('backups').add({ kind: 'before-strength-streak', data, created: now });
+      else if (data.streak.rulesVersion !== 2)
+        await tx
+          .objectStore('backups')
+          .add({ kind: 'before-training-day-streaks', data, created: now });
       await tx.objectStore('state').put(next, 'current');
       await tx.done;
       return next;

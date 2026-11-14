@@ -1,3 +1,4 @@
+import { streakFixture, completed, fillWeek } from '../tests/streak-unit-fixture';
 import 'fake-indexeddb/auto';
 import { it, expect, vi } from 'vitest';
 import {
@@ -30,42 +31,6 @@ import {
 import { initializeStreaks } from './streak-storage';
 import { createDatabaseBackup, inspectBackup, restoreDatabaseBackup } from './backup';
 const at = (date: string) => Date.parse(date + 'T12:00:00Z');
-export function streakFixture(count = 3, second?: number, scheduled = true): Data {
-  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const text =
-    `Program: Strength ${count}\n` +
-    [count, ...(second ? [second] : [])]
-      .map(
-        (n, index) =>
-          `${second ? `Week ${index + 1}\n` : ''}` +
-          Array.from(
-            { length: n },
-            (_, i) =>
-              `${scheduled ? days[i] + ': ' : ''}Workout ${String.fromCharCode(65 + i)}:\n- Exercise ${i + 1} 2x8 rest 90s`,
-          ).join('\n'),
-      )
-      .join('\n');
-  const p = parseProgram(textDocument(text));
-  programIssues(p).forEach((i) => (i.reviewed = true));
-  return applyProgram(emptyData(), p, true);
-}
-export function completed(d: Data, template: string, date: string): Workout {
-  const w = createWorkout(template, 'heavy', d.plan, at(date) - 600000, [], {
-    displayName: 'Saved workout',
-    cycleWeek: d.trainingProgram!.workouts.find((t) => t.id === template)!.week,
-  });
-  w.programId = d.activeProgramId;
-  w.finished = at(date);
-  w.exercises.forEach((e) =>
-    e.sets.forEach((s) => Object.assign(s, { weight: '50', reps: '8', done: true })),
-  );
-  return w;
-}
-export function fillWeek(d: Data, date: string, cycle = 1) {
-  d.trainingProgram!.workouts.filter((w) => w.week === cycle).forEach((w, i) =>
-    d.history.push(completed(d, w.id, addDays(date, i))),
-  );
-}
 for (const n of [3, 4, 5])
   it(`uses all ${n} scheduled workouts, never a hardcoded four`, () => {
     let d = streakFixture(n);
@@ -86,7 +51,7 @@ it('counts consecutive successful weeks, preserves a pending current week, then 
   expect(calculateStreak(d, at('2026-11-09')).current).toBe(0);
   expect(d.streak!.awards.find((a) => a.id === 'first-plates')!.valid).toBe(true);
 });
-it('a missing scheduled workout cannot be replaced by duplicates or extra repeats, even on other days', () => {
+it('modified and repeated workout names on different dates count, while same-date copies do not', () => {
   let d = streakFixture(4);
   const ts = d.trainingProgram!.workouts;
   d.history = [
@@ -97,8 +62,8 @@ it('a missing scheduled workout cannot be replaced by duplicates or extra repeat
   ];
   d.history.push({ ...structuredClone(d.history[0]), id: 'copy' });
   d = syncStreaks(d, at('2026-11-01'), 'UTC');
-  expect(calculateStreak(d, at('2026-11-01')).currentWeek!.chosen!.completed).toBe(3);
-  expect(calculateStreak(d, at('2026-11-01')).current).toBe(0);
+  expect(calculateStreak(d, at('2026-11-01')).currentWeek!.chosen!.completed).toBe(4);
+  expect(calculateStreak(d, at('2026-11-01')).current).toBe(1);
   d.history.push(completed(d, ts[3].id, '2026-11-01'));
   d = syncStreaks(d, at('2026-11-01'));
   expect(calculateStreak(d, at('2026-11-01')).current).toBe(1);
@@ -134,7 +99,8 @@ it('honors the imported rotation order rather than sorting cycle numbers', () =>
               `Week ${week}\n` +
               Array.from(
                 { length: week },
-                (_, i) => `Workout ${String.fromCharCode(65 + i)}:\n- Exercise ${i + 1} 2x8`,
+                (_, i) =>
+                  `${['Monday', 'Wednesday', 'Friday'][i]}: Workout ${String.fromCharCode(65 + i)}:\n- Exercise ${i + 1} 2x8`,
               ).join('\n'),
           )
           .join('\n'),
@@ -176,7 +142,7 @@ it('does not retroactively invent a target for unconfigured past weeks', () => {
     d.streak!.weeks.find((w) => w.week === '2026-10-26')!.goals.every((g) => g.target === null),
   ).toBe(true);
 });
-it('allows either complete plan in a switch week, never mixes partial plans and retains historical requirements', () => {
+it('counts all dates across plan switches toward the latest selected target and retains past requirements', () => {
   let a = streakFixture(3);
   fillWeek(a, '2026-10-19');
   a = syncStreaks(a, at('2026-10-26'), 'UTC');
@@ -200,13 +166,14 @@ it('allows either complete plan in a switch week, never mixes partial plans and 
   expect(calculateStreak(d, at('2026-11-03')).currentWeek!.goals).toHaveLength(1);
   expect(calculateStreak(d, at('2026-11-03')).currentWeek!.chosen!.goal.target).toBe(4);
 });
-it('switching plans after completing the week never removes that legitimate success', () => {
+it('switching the current plan uses its new target while preserving already completed dates', () => {
   let d = streakFixture(3);
   fillWeek(d, '2026-10-26');
   d = syncStreaks(d, at('2026-11-01'), 'UTC');
   d = applyProgram(d, streakFixture(5).trainingProgram!, true);
   d = syncStreaks(d, at('2026-11-01'));
-  expect(calculateStreak(d, at('2026-11-01')).current).toBe(1);
+  expect(calculateStreak(d, at('2026-11-01')).currentWeek!.chosen!.completed).toBe(3);
+  expect(calculateStreak(d, at('2026-11-01')).currentWeek!.chosen!.goal.target).toBe(5);
 });
 it('retains past snapshots when a program schedule changes', () => {
   let d = streakFixture(3);
@@ -220,7 +187,7 @@ it('retains past snapshots when a program schedule changes', () => {
   expect(d.streak!.weeks[0]).toEqual(saved);
   expect(calculateStreak(d, at('2026-11-03')).currentWeek!.chosen!.goal.target).toBe(4);
 });
-it('manual edits, exclusions and history deletion recalculate totals and revalidate award evidence', () => {
+it('set-detail edits preserve credit; session exclusions and deletion revalidate streak evidence', () => {
   let d = streakFixture(3);
   fillWeek(d, '2026-10-19');
   fillWeek(d, '2026-10-26');
@@ -228,8 +195,8 @@ it('manual edits, exclusions and history deletion recalculate totals and revalid
   expect(d.streak!.awards[0].valid).toBe(true);
   d.history[0].exercises[0].sets[0].reps = '';
   d = syncStreaks(d, at('2026-11-01'));
-  expect(calculateStreak(d, at('2026-11-01')).longest).toBe(1);
-  expect(d.streak!.awards[0].valid).toBe(false);
+  expect(calculateStreak(d, at('2026-11-01')).longest).toBe(2);
+  expect(d.streak!.awards[0].valid).toBe(true);
   d.history[0].exercises[0].sets[0].reps = '8';
   d = syncStreaks(d, at('2026-11-01'));
   expect(d.streak!.awards[0].valid).toBe(true);
@@ -240,7 +207,7 @@ it('manual edits, exclusions and history deletion recalculate totals and revalid
   d = syncStreaks(d, at('2026-11-01'));
   expect(calculateStreak(d, at('2026-11-01')).current).toBe(1);
 });
-it('never qualifies active, cancelled, abandoned, test, invalid or incomplete required logs; optional skips are allowed', () => {
+it('rejects unsaved and excluded sessions, but accepts finished sessions with skipped or incomplete set details', () => {
   const d = streakFixture(3),
     w = completed(d, d.trainingProgram!.workouts[0].id, '2026-10-26');
   for (const patch of [
@@ -254,20 +221,20 @@ it('never qualifies active, cancelled, abandoned, test, invalid or incomplete re
     expect(workoutStreakReason({ ...w, ...patch }, at('2026-10-27'))).not.toBeNull();
   const copy = structuredClone(w);
   copy.exercises[0].sets[0].skipped = true;
-  expect(workoutStreakReason(copy, at('2026-10-27'))).not.toBeNull();
+  expect(workoutStreakReason(copy, at('2026-10-27'))).toBeNull();
   copy.exercises.push(structuredClone(w.exercises[0]));
   copy.exercises[0].optional = true;
   copy.exercises[0].sets[0].done = false;
   expect(workoutStreakReason(copy, at('2026-10-27'))).toBeNull();
 });
-it('requires exact verified ownership; ambiguous legacy history is preserved but not credited', () => {
+it('counts legacy completed history without requiring template ownership and preserves all records', () => {
   let d = streakFixture(3);
   fillWeek(d, '2026-10-26');
   d = applyProgram(d, d.trainingProgram!, true);
   d.history.forEach((w) => delete w.programId);
   const history = structuredClone(d.history);
   d = syncStreaks(d, at('2026-11-01'), 'UTC');
-  expect(calculateStreak(d, at('2026-11-01')).current).toBe(0);
+  expect(calculateStreak(d, at('2026-11-01')).current).toBe(1);
   expect(d.history).toEqual(history);
 });
 it('handles Monday/Sunday, year boundaries, half-hour offsets and DST using calendar dates', () => {
@@ -429,9 +396,7 @@ it('recognizes a single explicit table week while leaving blank implicit week co
     });
     programIssues(p).forEach((i) => (i.reviewed = true));
     const d = syncStreaks(applyProgram(emptyData(), p, true), at('2026-11-10'), 'UTC');
-    expect(calculateStreak(d, at('2026-11-10')).currentWeek!.chosen!.goal.target).toBe(
-      value === '1' ? 2 : null,
-    );
+    expect(calculateStreak(d, at('2026-11-10')).currentWeek!.chosen!.goal.target).toBe(null);
     expect(calculateStreak(d, at('2026-11-10')).currentWeek!.chosen!.goal.showCycle).toBe(
       value === '1',
     );

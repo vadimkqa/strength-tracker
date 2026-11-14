@@ -2,7 +2,8 @@ import type { Data, Workout } from './data';
 import { currentProgram, programView, rememberProgram } from './programs';
 import { scheduleMetadata } from './program-schedule';
 import { addDays, localDate, monday, cycleForDate, assertCalendar } from './calendar';
-import { historyProgram, workoutStreakReason } from './streak';
+import { historyProgram } from './streak';
+import { calendarCompletionReason as workoutStreakReason } from './calendar-completion';
 import { carouselWorkouts } from './workouts';
 export interface WorkoutSuggestion {
   date: string;

@@ -2637,3 +2637,94 @@ main.home-screen {
   font-size: 11px;
   line-height: 1.6;
 }
+
+/* Calendar dates count once, independently of the program's exercise prescriptions. */
+.training-week-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  list-style: none;
+  padding: 0;
+  margin: 20px 0 12px;
+}
+.training-calendar-day {
+  min-width: 0;
+  padding: 8px 1px;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 5px;
+  border: 1px solid #35253f;
+  border-radius: 10px;
+  background: #130e1a;
+}
+.training-calendar-weekday {
+  font-size: 9px;
+  color: var(--muted);
+}
+.training-calendar-date {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.training-calendar-symbol {
+  width: 22px;
+  height: 22px;
+  border: 1px solid #74518a;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+}
+.training-calendar-state {
+  font-size: 8px;
+  color: var(--muted);
+}
+.training-calendar-day.completed {
+  border-color: #9856dd80;
+  background: #261733;
+}
+.training-calendar-day.completed .training-calendar-symbol {
+  background: #9856dd30;
+  color: var(--highlight);
+  border-color: var(--purple);
+}
+.training-calendar-day.missed .training-calendar-symbol {
+  border-style: dashed;
+  border-color: #b98d66;
+  color: #e0b58e;
+}
+.training-calendar-day.rest .training-calendar-symbol {
+  border-color: transparent;
+  color: var(--muted);
+}
+.training-calendar-day.today {
+  outline: 1px solid #b67aff70;
+  outline-offset: 2px;
+}
+.streak-weekday-controls {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 12px 0;
+}
+.streak-weekday-controls label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 44px;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid #493259;
+  border-radius: 10px;
+  font-size: 11px;
+}
+.streak-weekday-controls input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--purple);
+}
+.training-calendar-note {
+  font-size: 11px;
+  line-height: 1.6;
+}

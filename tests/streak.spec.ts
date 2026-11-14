@@ -51,6 +51,8 @@ test('never awards failed or pending saves; successful retry unlocks once and re
 }) => {
   const seed = streakData();
   await seedStreak(page, seed);
+  // The third training day must be a new local date; two sessions on Tuesday now count once.
+  await page.clock.setSystemTime(Date.parse('2026-11-11T12:00:00Z'));
   await page.getByRole('button', { name: 'Select Workout C', exact: true }).click();
   await page.getByRole('button', { name: 'START WORKOUT' }).click();
   page.on('dialog', (d) => d.accept());
@@ -104,7 +106,7 @@ test('never awards failed or pending saves; successful retry unlocks once and re
     page.getByRole('button', { name: 'Strength Streak, 3 consecutive weeks', exact: true }),
   ).toBeVisible();
 });
-test('unscheduled targets and timezone validation persist without changing the imported program or home selection', async ({
+test('unscheduled target override and fixed Vienna timezone persist without changing the plan or home selection', async ({
   page,
 }) => {
   const d = streakData(0, 1, false);
@@ -114,12 +116,12 @@ test('unscheduled targets and timezone validation persist without changing the i
     .click();
   await expect(page.getByTestId('weekly-progress')).toHaveText('0 / Target needed');
   await page.getByText('Streak settings and rotation', { exact: true }).click();
-  await page.getByLabel('CALENDAR TIMEZONE', { exact: true }).fill('invalid/zone');
-  await page.getByLabel('WEEKLY WORKOUT TARGET', { exact: true }).fill('3');
+  await expect(page.getByLabel('CALENDAR TIMEZONE', { exact: true })).toHaveCount(0);
+  await page.getByLabel("Override the program's weekly target", { exact: true }).check();
+  await page.getByLabel('WEEKLY TRAINING-DAY TARGET', { exact: true }).fill('8');
   await page.getByRole('button', { name: 'Save streak settings', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('valid IANA timezone');
-  await page.getByLabel('CALENDAR TIMEZONE', { exact: true }).fill('Europe/Vienna');
-  page.once('dialog', (d) => d.accept());
+  await expect(page.getByRole('alert')).toContainText('1–7');
+  await page.getByLabel('WEEKLY TRAINING-DAY TARGET', { exact: true }).fill('3');
   await page.getByRole('button', { name: 'Save streak settings', exact: true }).click();
   await expect(page.getByTestId('weekly-progress')).toHaveText('0 / 3');
   const after = await stored(page);
