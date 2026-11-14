@@ -133,6 +133,8 @@ test('short taps, numeric input, scrolling and cancelled hold do not reorder; ke
   await page.keyboard.press('Escape');
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await cdp.detach();
+  // dnd-kit retains its document click shield for 50ms after cancelling a touch.
+  await page.waitForTimeout(80);
   await expect.poll(() => names(page)).toEqual(original);
   await page
     .getByRole('button', { name: 'Expand Bench Press', exact: true })

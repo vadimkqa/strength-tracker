@@ -1,7 +1,13 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const { classifyFiles, autoMergeBlock, latestReviews, validAttestation } = require('./policy.cjs');
+const {
+  classifyFiles,
+  autoMergeBlock,
+  latestChecks,
+  latestReviews,
+  validAttestation,
+} = require('./policy.cjs');
 const { run: autoRun } = require('./auto-merge.cjs');
 const { run: reviewRun } = require('./review.cjs');
 const sha = 'a'.repeat(40),
@@ -192,7 +198,12 @@ function mock(x = eligible()) {
         method === pulls.listFiles
           ? x.files
           : method === checks.listForRef
-            ? x.checks
+            ? (() => {
+                const matching = x.checks.filter((c) => c.head_sha === params.ref);
+                // Match GitHub's default latest filter: older attestations are
+                // unavailable unless the caller explicitly asks for all runs.
+                return params.filter === 'all' ? matching : [...latestChecks(matching).values()];
+              })()
             : method === github.rest.repos.listPullRequestsAssociatedWithCommit
               ? x.associated || []
               : x.reviews || [];
@@ -404,4 +415,69 @@ test('trusted policy workflow can invoke the same guarded enabler after its chec
   blocked.requestedPR = '10;echo bad';
   await assert.rejects(autoRun(blocked), /valid PR number/);
   assert.equal(blocked.mutations.length, 0);
+});
+
+test('persisted exact-head attestation remains discoverable behind newer failed checks and repeated evaluations', async () => {
+  const x = eligible();
+  x.files = [file('scripts/automation/review.cjs')];
+  x.checks.push(
+    { ...check('Merge policy', 100), external_id: `manual-review:10:${sha}:maintainer` },
+    { ...check('Merge policy', 101), conclusion: 'failure', external_id: `policy:10:${sha}` },
+  );
+  const m = mock(x);
+  m.context.eventName = 'pull_request_target';
+  m.context.payload = { pull_request: { number: 10 } };
+  for (let n = 0; n < 2; n++) {
+    await reviewRun(m);
+    const posted = m.posted.at(-1);
+    assert.equal(posted.conclusion, 'success');
+    assert.equal(posted.external_id, `manual-review:10:${sha}:maintainer`);
+    x.checks.push({ ...posted, id: 102 + n, app: { slug: 'github-actions' } });
+  }
+  x.pull.head.sha = base;
+  await reviewRun(m);
+  assert.equal(m.posted.at(-1).conclusion, 'failure');
+  assert.equal(m.mutations.length, 0);
+});
+
+test('historical check lookup never accepts invalid, stale, non-human or blocked attestations', async () => {
+  for (const alter of [
+    (m, x, c) => (c.external_id = `manual-review:99:${sha}:maintainer`),
+    (m, x, c) => (c.external_id = `manual-review:10:${base}:maintainer`),
+    (m, x, c) => (c.external_id = undefined),
+    (m, x, c) => (c.head_sha = base),
+    (m, x, c) => (c.conclusion = 'failure'),
+    (m, x, c) => (c.status = 'in_progress'),
+    (m, x, c) => (c.app.slug = 'other-app'),
+    (m) => (m.github.rest.users.getByUsername = async () => ({ data: { type: 'Bot' } })),
+    (m) =>
+      (m.github.rest.repos.getCollaboratorPermissionLevel = async () => ({
+        data: { permission: 'read' },
+      })),
+    (m, x) =>
+      (x.reviews = [
+        {
+          id: 1,
+          state: 'CHANGES_REQUESTED',
+          user: { login: 'reviewer', type: 'User' },
+          commit_id: sha,
+        },
+      ]),
+    (m, x) => x.pull.labels.push({ name: 'do-not-merge' }),
+  ]) {
+    const x = eligible();
+    x.files = [file('src/data.ts')];
+    const attestation = {
+      ...check('Merge policy', 100),
+      external_id: `manual-review:10:${sha}:maintainer`,
+    };
+    x.checks.push(attestation, { ...check('Merge policy', 101), conclusion: 'failure' });
+    const m = mock(x);
+    m.context.eventName = 'pull_request_target';
+    m.context.payload = { pull_request: { number: 10 } };
+    alter(m, x, attestation);
+    await reviewRun(m);
+    assert.equal(m.posted.at(-1).conclusion, 'failure');
+    assert.equal(m.mutations.length, 0);
+  }
 });

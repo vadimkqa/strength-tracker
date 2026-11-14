@@ -80,6 +80,10 @@ async function run({ github, context, core }) {
           owner,
           repo,
           ref: pull.head.sha,
+          // GitHub defaults to latest: a newer failed evaluation can hide the
+          // successful manual attestation from a different workflow run.
+          // Search all runs; the strict PR/SHA/app/actor checks below still apply.
+          filter: 'all',
           per_page: 100,
         });
         for (const check of checks) {
