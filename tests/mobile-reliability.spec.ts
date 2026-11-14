@@ -47,9 +47,20 @@ for (const size of [
     await expect
       .poll(async () => {
         const r = (await field.boundingBox())!;
-        return r.y >= 78 && r.y + r.height <= 70 + size.height - 320 - 8;
+        if (r.y >= 78 && r.y + r.height <= 70 + size.height - 320 - 8) return 'visible';
+        return JSON.stringify(
+          await field.evaluate((e) => ({
+            rect: e.getBoundingClientRect().toJSON(),
+            scrollY,
+            scale: visualViewport?.scale,
+            top: visualViewport?.offsetTop,
+            height: visualViewport?.height,
+            scrollHeight: document.documentElement.scrollHeight,
+            innerHeight,
+          })),
+        );
       })
-      .toBe(true);
+      .toBe('visible');
     expect(
       await field.evaluate((e) => parseFloat(getComputedStyle(e).fontSize)),
     ).toBeGreaterThanOrEqual(16);
