@@ -5,5 +5,5 @@ export default defineConfig({
   ...base,
   testMatch: browserName === 'webkit' ? ['**/mobile-reliability.spec.ts'] : undefined,
   use: { ...base.use, browserName, launchOptions: {} },
-  reporter: process.env.CI ? ['list', 'github'] : 'list',
+  reporter: process.env.CI ? [['list'], ['github']] : 'list',
 });
