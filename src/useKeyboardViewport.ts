@@ -6,7 +6,12 @@ export function focusedInputDelta(
 ) {
   const top = viewport.offsetTop + 8,
     bottom = viewport.offsetTop + viewport.height - 8;
-  return rect.bottom > bottom ? rect.bottom - bottom : rect.top < top ? rect.top - top : 0;
+  // Browser scroll positions can round to whole CSS pixels; round outward so the safety gap survives.
+  return rect.bottom > bottom
+    ? Math.ceil(rect.bottom - bottom)
+    : rect.top < top
+      ? Math.floor(rect.top - top)
+      : 0;
 }
 export function useKeyboardViewport() {
   useEffect(() => {
@@ -50,7 +55,7 @@ export function useKeyboardViewport() {
             focused.getBoundingClientRect(),
             vv || { offsetTop: 0, height: innerHeight },
           );
-          if (Math.abs(delta) > 2) window.scrollBy({ top: delta, behavior: 'instant' });
+          if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
         }
         window.dispatchEvent(new Event('workout-viewport-change'));
       });
