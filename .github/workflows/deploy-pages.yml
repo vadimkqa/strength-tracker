@@ -27,10 +27,24 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Test merge-policy safeguards
+        run: npm run test:workflow
       - name: Run unit tests
         run: npm test
-      - name: Build production PWA
+      - name: Check TypeScript and build production PWA
         run: npm run build
+      - name: Install browser for mobile regression tests
+        run: npx playwright install --with-deps chromium
+      - name: Run mobile browser tests
+        run: npm run test:e2e -- --reporter=list,github
+      - name: Upload failed browser test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
