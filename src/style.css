@@ -1625,6 +1625,9 @@ nav[aria-label='Main navigation'] {
   bottom: 0;
 }
 main.active-workout {
+  /* The base main uses hidden overflow; never let Safari focus-scroll it separately. */
+  overflow-x: clip;
+  overflow-y: visible;
   padding-bottom: calc(100px + env(safe-area-inset-bottom));
 }
 main:not(.active-workout) {

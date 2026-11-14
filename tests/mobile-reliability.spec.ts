@@ -56,6 +56,7 @@ for (const size of [
             top: visualViewport?.offsetTop,
             height: visualViewport?.height,
             scrollHeight: document.documentElement.scrollHeight,
+            mainScroll: document.querySelector('main')?.scrollTop,
             innerHeight,
           })),
         );
@@ -74,6 +75,10 @@ for (const size of [
     });
     await expect(field).toHaveValue('72.5');
     await expect(field).toBeFocused();
+    expect(await page.locator('main').evaluate((e) => getComputedStyle(e).overflowY)).toBe(
+      'visible',
+    );
+    expect(await page.locator('main').evaluate((e) => e.scrollTop)).toBe(0);
     const title = page.getByRole('button', { name: 'Bench Press details', exact: true });
     // Header holds while typing must not activate a sensor or steal focus.
     const box = (await title.boundingBox())!;
