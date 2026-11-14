@@ -1,4 +1,5 @@
 import { TimerBubble } from './TimerBubble';
+import { useDndContext } from '@dnd-kit/core';
 import { useRef, type ReactNode } from 'react';
 import type { Workout } from './data';
 import { findSet, pendingLogs, startSet, stopSet, stopwatch } from './controller';
@@ -10,6 +11,7 @@ interface Props {
   children: ReactNode;
 }
 export function WorkoutScreens({ workout: w, now, change, finish, children }: Props) {
+  const { active: sorting } = useDndContext();
   const c = w.controller!;
   const origin = useRef<{ x: number; y: number } | null>(null);
   const busy = useRef(0);
@@ -38,7 +40,7 @@ export function WorkoutScreens({ workout: w, now, change, finish, children }: Pr
               : 'START NEXT SET';
   return (
     <div
-      className="workout-controller"
+      className={`workout-controller ${sorting ? 'exercise-sorting' : ''}`}
       onClickCapture={(event) => {
         if (swallowClick.current) {
           event.preventDefault();
@@ -47,6 +49,10 @@ export function WorkoutScreens({ workout: w, now, change, finish, children }: Pr
         }
       }}
       onPointerDown={(e) => {
+        if (sorting) {
+          origin.current = null;
+          return;
+        }
         if (
           (e.target as HTMLElement).closest(
             'input,textarea,select,button,a,summary,[contenteditable=true]',
@@ -60,6 +66,10 @@ export function WorkoutScreens({ workout: w, now, change, finish, children }: Pr
       }}
       onPointerCancel={() => (origin.current = null)}
       onPointerUp={(e) => {
+        if (sorting) {
+          origin.current = null;
+          return;
+        }
         const p = origin.current;
         origin.current = null;
         if (!p) return;

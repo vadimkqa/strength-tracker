@@ -5,7 +5,9 @@ import { cardExpanded, exerciseComplete, toggleExerciseCard } from './exercise-c
 import { positions, selectSet, skipSet, reconcile, validLog } from './controller';
 import { exerciseIdentity, addPerformanceSet, setNumber } from './performance';
 import { repsLabel } from './prescriptions';
+import type { ExerciseSortControls } from './SortableWorkout';
 interface Props {
+  sort?: ExerciseSortControls;
   workout: Workout;
   exercise: Exercise;
   change: (fn: (w: Workout) => Workout) => void;
@@ -15,7 +17,7 @@ const photos: Record<string, string> = {
   [exerciseIdentity('Pull-ups')]: 'pullups',
   [exerciseIdentity('Leg Press')]: 'legs',
 };
-export function ExerciseCard({ workout: w, exercise: e, change }: Props) {
+export function ExerciseCard({ workout: w, exercise: e, change, sort }: Props) {
   const open = cardExpanded(w, e),
     complete = exerciseComplete(w, e),
     running = w.controller?.running?.exerciseId === e.id;
@@ -86,7 +88,12 @@ export function ExerciseCard({ workout: w, exercise: e, change }: Props) {
       <div className="exercise-card-header">
         <h3 className="exercise-heading" aria-label={e.name}>
           <button
-            className="exercise-toggle"
+            {...sort?.attributes}
+            {...sort?.listeners}
+            ref={sort?.ref}
+            className={`exercise-toggle ${sort ? 'sortable-exercise-title' : ''}`}
+            title={sort ? 'Hold to reorder. Keyboard move controls are in Set options.' : undefined}
+            onContextMenu={sort ? (event) => event.preventDefault() : undefined}
             aria-label={`${e.name} details`}
             aria-expanded={open}
             aria-controls={bodyId}
@@ -99,6 +106,7 @@ export function ExerciseCard({ workout: w, exercise: e, change }: Props) {
                 alt=""
                 onError={() => setBrokenImage(image)}
                 loading="lazy"
+                draggable={false}
               />
             )}
             <span className="exercise-card-title">
@@ -271,6 +279,24 @@ export function ExerciseCard({ workout: w, exercise: e, change }: Props) {
             <details className="set-options">
               <summary aria-label={`Set options for ${e.name}`}>Set options</summary>
               <div className="exercise-tools">
+                {sort && (
+                  <>
+                    <button
+                      disabled={sort.index === 0}
+                      aria-label={`Move ${e.name} up`}
+                      onClick={() => sort.move(-1)}
+                    >
+                      Move up
+                    </button>
+                    <button
+                      disabled={sort.index === sort.count - 1}
+                      aria-label={`Move ${e.name} down`}
+                      onClick={() => sort.move(1)}
+                    >
+                      Move down
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={() =>
                     modify((e, w) => {
