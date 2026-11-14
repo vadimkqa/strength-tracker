@@ -36,7 +36,7 @@ jobs:
       - name: Install browser for mobile regression tests
         run: npx playwright install --with-deps chromium
       - name: Run mobile browser tests
-        run: npm run test:e2e
+        run: npm run test:e2e -- --reporter=list,github
       - name: Upload failed browser test artifacts
         if: failure()
         uses: actions/upload-artifact@v4

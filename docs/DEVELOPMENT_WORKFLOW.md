@@ -33,7 +33,7 @@ npm run build        # TypeScript checking + Vite production build
 npm run test:e2e     # relevant browser specs locally; all specs in CI
 ```
 
-Node 24 is used in CI. CI installs Playwright Chromium and uses its managed executable; local development retains `/usr/bin/chromium` or `CHROMIUM_PATH`. The `build` check runs merge-policy tests, application unit tests, TypeScript/production build and all mobile browser tests. Failed browser artifacts are retained for seven days. Pages artifacts and deployment remain restricted to successful `main` runs; PRs do not deploy.
+Node 24 is used in CI. CI installs Playwright Chromium and uses its managed executable; local development retains `/usr/bin/chromium` or `CHROMIUM_PATH`. The `build` check runs merge-policy tests, application unit tests, TypeScript/production build and all mobile browser tests. Browser failures are also annotated directly on GitHub PR checks, and failed browser artifacts are retained for seven days. Pages artifacts and deployment remain restricted to successful `main` runs; PRs do not deploy.
 
 Create a PR. Eligible finished presentation/doc updates may receive `auto-merge`; the policy deliberately declines protected or ambiguous work. This includes migrations, backup/restore, history, streak calculations, persistence/controller/plan modules, dependency and workflow changes. Protected modules such as `src/main.tsx` contain both UI and persistence, so even a small change there needs review. Do not rename or move logic to evade the policy. Unsupported or missing diffs fail closed. Presentation components also receive a conservative scan for storage/history execution references.
 
