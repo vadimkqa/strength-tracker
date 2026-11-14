@@ -759,7 +759,7 @@ function App() {
                   <p className="streak-eligibility muted">
                     {workoutStreakReason(w, now)
                       ? `Streak: ${workoutStreakReason(w, now)}`
-                      : 'Valid completed log · streak eligibility also depends on its saved weekly program goal.'}
+                      : 'Saved completed session · counts once per Europe/Vienna date, regardless of exercises or template.'}
                   </p>
                   <label className="checkbox-label history-streak-exclusion">
                     <input

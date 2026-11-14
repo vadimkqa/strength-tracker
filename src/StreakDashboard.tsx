@@ -1,7 +1,16 @@
 import { useState, useEffect } from 'react';
 import type { Data } from './data';
 import { currentProgram, programWeeks } from './programs';
-import { STREAK_LEVELS, calculateStreak, levelFor, configureStreak, validTimeZone } from './streak';
+import {
+  STREAK_LEVELS,
+  calculateStreak,
+  levelFor,
+  configureStreak,
+  STREAK_TIME_ZONE,
+} from './streak';
+import { WEEKDAYS } from './calendar';
+import { scheduleMetadata } from './program-schedule';
+import { TrainingWeekCalendar } from './TrainingWeekCalendar';
 import { StreakIcon, SecretStreakIcon } from './StreakIcon';
 import { artworkFor, secretUnlocked, SECRET_WEEKS } from './streak-artwork';
 interface Props {
@@ -22,12 +31,28 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
     current?.goals.filter((g) => g.goal.programId === active?.id).at(-1)?.goal.cycleWeek ||
     cycles[0] ||
     1;
-  const [zone, setZone] = useState(s.timeZone),
-    [target, setTarget] = useState(String(s.targets[active?.id || ''] || '')),
+  const [target, setTarget] = useState(String(s.targets[active?.id || ''] || '')),
+    [override, setOverride] = useState(s.targets[active?.id || ''] !== undefined),
+    [customDays, setCustomDays] = useState(s.trainingDays?.[active?.id || ''] !== undefined),
+    [selectedDays, setDays] = useState<number[]>(
+      s.trainingDays?.[active?.id || ''] || goal?.goal.weekdays || [],
+    ),
     [selectedCycle, setCycle] = useState(cycle),
     [error, setError] = useState(''),
     [historyLimit, setHistoryLimit] = useState(12);
-  useEffect(() => setCycle(cycle), [cycle, active?.id]);
+  const planCycle = active
+    ? scheduleMetadata(active).cycles.find((c) => c.week === cycle)
+    : undefined;
+  const planDays = planCycle?.sessions.every((s) => s.day !== null)
+    ? [...new Set(planCycle.sessions.map((s) => s.day!))]
+    : null;
+  useEffect(() => {
+    setCycle(cycle);
+    setTarget(String(s.targets[active?.id || ''] || ''));
+    setOverride(s.targets[active?.id || ''] !== undefined);
+    setCustomDays(s.trainingDays?.[active?.id || ''] !== undefined);
+    setDays(s.trainingDays?.[active?.id || ''] || goal?.goal.weekdays || []);
+  }, [cycle, active?.id]);
   const level = levelFor(report.current),
     next = STREAK_LEVELS.find((l) => l.weeks > report.longest),
     secret = secretUnlocked(report.longest);
@@ -102,62 +127,84 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
               control.
             </p>
           )}
-        {current?.goals.length && current.goals.length > 1 ? (
-          <p className="muted">
-            This week has saved alternative requirements. Fully complete one goal; partial plans do
-            not combine.
-          </p>
-        ) : null}
+        {goal && <TrainingWeekCalendar days={goal.days} />}
+        <p className="muted training-calendar-note">
+          One saved training day per date. Rest-day and make-up workouts count toward the same
+          weekly target.
+        </p>
       </section>
       <details className="card streak-settings">
         <summary>Streak settings and rotation</summary>
         <p className="muted">
           Active program: {active?.name}. Schedule changes apply to this week onward; past
-          requirements stay frozen. Existing current-week goals remain eligible.
+          requirements stay saved. This week's latest target applies to all completed dates.
         </p>
-        <label htmlFor="streak-zone">CALENDAR TIMEZONE</label>
-        <input
-          id="streak-zone"
-          value={zone}
-          onChange={(e) => setZone(e.target.value)}
-          list="streak-zones"
-        />
-        <datalist id="streak-zones">
-          {[
-            ...new Set([
-              s.timeZone,
-              'Europe/Vienna',
-              'UTC',
-              'America/New_York',
-              'Europe/London',
-              'Asia/Tokyo',
-            ]),
-          ].map((z) => (
-            <option value={z} key={z} />
-          ))}
-        </datalist>
         <p className="muted">
-          Changing timezone reassigns workout completion dates to calendar weeks. Saved weekly
-          requirements remain fixed.
+          Monday–Sunday · <b>{STREAK_TIME_ZONE}</b>. Summer/winter time is handled automatically.
         </p>
-        {last?.mode === 'manual' && (
-          <>
-            <label htmlFor="streak-target">WEEKLY WORKOUT TARGET</label>
-            <input
-              id="streak-target"
-              type="number"
-              min="1"
-              max="14"
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-            />
-            <p className="muted">
-              No weekly frequency is specified in this program. Count distinct workout/day
-              occurrences; repeating the same session on the same date counts once. Earlier
-              unconfigured weeks stay unconfigured.
-            </p>
-          </>
-        )}
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={override}
+            onChange={(e) => setOverride(e.target.checked)}
+          />
+          Override the program's weekly target
+        </label>
+        <label htmlFor="streak-target">WEEKLY TRAINING-DAY TARGET</label>
+        <input
+          id="streak-target"
+          type="number"
+          min="1"
+          max="7"
+          disabled={!override}
+          value={target}
+          placeholder={String((customDays ? selectedDays.length : planDays?.length) || '')}
+          onChange={(e) => setTarget(e.target.value)}
+        />
+        <p className="muted">
+          {override
+            ? 'Choose 1–7 distinct training dates per week.'
+            : customDays
+              ? `Selected weekdays: ${selectedDays.length} training days per week.`
+              : planDays?.length
+                ? `Program schedule: ${planDays.length} training days in this cycle week.`
+                : 'Select training weekdays or set an explicit target; unspecified frequency is not invented.'}
+        </p>
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={!customDays}
+            onChange={(e) => {
+              setCustomDays(!e.target.checked);
+              if (e.target.checked) setDays(planDays || []);
+            }}
+          />
+          Use the program's training weekdays
+        </label>
+        <div className="streak-weekday-controls" role="group" aria-label="Training weekdays">
+          {WEEKDAYS.map((day, index) => (
+            <label key={day}>
+              <input
+                type="checkbox"
+                aria-label={day}
+                checked={selectedDays.includes(index)}
+                onChange={(e) => {
+                  setCustomDays(true);
+                  setDays(
+                    e.target.checked
+                      ? [...selectedDays, index].sort((a, b) => a - b)
+                      : selectedDays.filter((d) => d !== index),
+                  );
+                }}
+              />
+              {day.slice(0, 3)}
+            </label>
+          ))}
+        </div>
+        <p className="muted">
+          All other days are rest days. A missed planned date can be made up on any other date in
+          the same week. These reminders do not change workout templates or carousel scheduling.
+        </p>
         {cycles.length > 1 && (
           <>
             <label htmlFor="streak-cycle">THIS CALENDAR WEEK USES PROGRAM WEEK</label>
@@ -176,7 +223,8 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
         )}
         {active?.review && (
           <p className="notice">
-            Review program ownership in Settings before enabling its streak goal.
+            This plan needs review in Settings. You can still set an explicit weekly target;
+            completed-day credit does not require program ownership.
           </p>
         )}
         {error && <p role="alert">{error}</p>}
@@ -184,31 +232,20 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
           className="full"
           disabled={busy}
           onClick={() => {
-            if (!validTimeZone(zone)) {
-              setError('Enter a valid IANA timezone, such as Europe/Vienna.');
-              return;
-            }
             if (
-              last?.mode === 'manual' &&
-              (!Number.isInteger(Number(target)) || Number(target) < 1 || Number(target) > 14)
+              override &&
+              (!Number.isInteger(Number(target)) || Number(target) < 1 || Number(target) > 7)
             ) {
-              setError('Set a weekly target of 1–14 workouts.');
+              setError('Set a weekly target of 1–7 training days.');
               return;
             }
-            if (
-              zone !== s.timeZone &&
-              !confirm(
-                'Recalculate calendar-week membership in this timezone? Weekly requirements remain saved; corrected streaks and achievements will be revalidated.',
-              )
-            )
-              return;
             setError('');
             change((d) =>
               configureStreak(
                 d,
                 {
-                  timeZone: zone,
-                  target: last?.mode === 'manual' ? Number(target) : undefined,
+                  target: override ? Number(target) : null,
+                  weekdays: customDays ? selectedDays : null,
                   cycleWeek: selectedCycle !== cycle ? selectedCycle : undefined,
                 },
                 now,
@@ -288,35 +325,19 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
                         : 'Target unspecified'}
                 </b>
               </summary>
-              {w.goals.map((g) => (
+              {(w.chosen ? [w.chosen] : []).map((g) => (
                 <div key={g.goal.id} className="week-goal">
                   <p>
                     <b>{g.goal.name}</b>
                     {g.goal.showCycle ? ` · Program Week ${g.goal.cycleWeek}` : ''} · {g.completed}/
                     {g.goal.target ?? 'Unspecified'}
                   </p>
-                  {g.goal.mode === 'scheduled' ? (
-                    <ul>
-                      {g.sessions.map((v, i) => (
-                        <li key={i}>
-                          {v.complete ? '✓' : '○'} {v.name}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <>
-                      <p className="muted">
-                        {g.goal.target === null
-                          ? 'Weekly target not specified.'
-                          : `${Math.max(0, g.goal.target - g.completed)} qualifying workouts remaining.`}
-                      </p>
-                      <ul>
-                        {g.sessions.map((v, i) => (
-                          <li key={i}>✓ {v.name}</li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
+                  <TrainingWeekCalendar days={g.days} />
+                  <p className="muted">
+                    {g.goal.target === null
+                      ? 'Weekly target not specified.'
+                      : `${Math.max(0, g.goal.target - g.completed)} more distinct training days needed.`}
+                  </p>
                 </div>
               ))}
             </details>
@@ -334,23 +355,19 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
       <details className="card">
         <summary>How Strength Streak works</summary>
         <p className="muted">
-          A saved workout counts only after every required exercise and set has a valid completed
-          log. Optional exercises may be skipped. Required skips, unfinished sets, test/practice
-          exclusions, abandoned sessions and unsaved active sessions do not count. Completion time
-          determines the Monday–Sunday week in your configured timezone.
+          Each properly finished, saved workout qualifies unless excluded as practice/test,
+          cancelled or abandoned. Exercise names, templates, skipped sets and changed prescriptions
+          are not checked. Multiple workouts on one date earn one training-day credit.
         </p>
         <p className="muted">
-          Scheduled sessions must each be completed once; repeats and extra workouts cannot replace
-          a missing session. For unscheduled targets, the same workout on the same local day counts
-          once. A missed past week breaks the streak; the current unfinished week does not. Full
-          completion of either plan qualifies during a plan-switch week. Requirements are saved
-          separately from the editable plan.
+          Completion date determines the Monday–Sunday week in Europe/Vienna. Meet the weekly target
+          using any distinct dates, including rest days or make-ups. Rest days alone add no credit.
+          A missed past week breaks the streak; an unfinished current week preserves it.
         </p>
         <p className="muted">
-          Earlier history is matched by program ID or an unambiguous exact template ID and uses
-          retained program schedules. Ambiguous legacy ownership is excluded. {report.ignored}{' '}
-          historical records currently have invalid logs, explicit exclusions or unresolved
-          ownership.
+          Existing history is recalculated under these rules without changing records.{' '}
+          {report.ignored} saved records are currently excluded, unfinished or missing a valid
+          completion time.
         </p>
       </details>
     </div>

@@ -286,6 +286,14 @@ export function mergeBackup(current: Data, incoming: Data): Data {
           streak.targets[source.id] = current.streak.targets[source.id];
         else delete streak.targets[source.id];
       }
+      const weekdays = incoming.streak.trainingDays?.[source.id];
+      if (restored && weekdays !== undefined) {
+        streak.trainingDays ||= {};
+        streak.trainingDays[restored.id] = structuredClone(weekdays);
+        if (current.streak?.trainingDays?.[source.id] !== undefined)
+          streak.trainingDays[source.id] = structuredClone(current.streak.trainingDays[source.id]);
+        else delete streak.trainingDays[source.id];
+      }
     }
   }
   const next: Data = {

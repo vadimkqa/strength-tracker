@@ -3,7 +3,7 @@ export { localDate, calendarWeek, addDays, validTimeZone } from './calendar';
 import { scheduleMetadata } from './program-schedule';
 import type { Data, Workout } from './data';
 import { currentProgram, migratePrograms, programView, type SavedProgram } from './programs';
-import { validLog } from './controller';
+import { weekdayNumber, WEEKDAYS } from './calendar';
 export const STREAK_LEVELS = [
   {
     id: 'basic',
@@ -96,6 +96,7 @@ export interface StreakSession {
   templateIds: string[];
 }
 export interface StreakCycle {
+  weekdays?: number[] | null;
   week: number;
   sessions: StreakSession[];
 }
@@ -113,6 +114,7 @@ export interface StreakPolicy {
   cycles: StreakCycle[];
 }
 export interface WeekGoal {
+  weekdays?: number[] | null;
   showCycle?: boolean;
   id: string;
   programId: string;
@@ -133,6 +135,8 @@ export interface StreakAward {
   valid: boolean;
 }
 export interface StreakState {
+  rulesVersion?: 2;
+  trainingDays?: Record<string, number[]>;
   version: 1;
   timeZone: string;
   targets: Record<string, number>;
@@ -142,7 +146,8 @@ export interface StreakState {
 }
 const distance = (a: string, b: string) =>
   (Date.parse(b + 'T12:00Z') - Date.parse(a + 'T12:00Z')) / 604800000;
-/** Only completed, saved, valid logs qualify. Explicit practice/test flags are never inferred from names. */
+/** Fixed local calendar for training-day streaks, including DST. */
+export const STREAK_TIME_ZONE = 'Europe/Vienna';
 export function workoutStreakReason(w: Workout, now = Date.now()): string | null {
   if (
     w.streakExcluded === true ||
@@ -161,29 +166,6 @@ export function workoutStreakReason(w: Workout, now = Date.now()): string | null
     w.finished! > now
   )
     return 'No valid saved completion time';
-  if (w.controller?.phase === 'set' || w.controller?.running) return 'A set was still running';
-  if (
-    !w.exercises.length ||
-    !w.exercises.some((e) =>
-      e.sets.some((s) => s.done && !s.skipped && !s.needsLogging && validLog(s)),
-    )
-  )
-    return 'No valid completed sets';
-  if (
-    w.exercises.some((e) =>
-      e.sets.some((s) => s.needsLogging || (s.done && (!validLog(s) || s.skipped))),
-    )
-  )
-    return 'Invalid or unresolved completed logging';
-  for (const e of w.exercises) {
-    if (e.optional) continue;
-    if (
-      e.skipped ||
-      !e.sets.length ||
-      e.sets.some((s) => !s.done || s.skipped || s.needsLogging || !validLog(s))
-    )
-      return 'Required exercises or sets are unfinished';
-  }
   return null;
 }
 export function historyProgram(w: Workout, entries: SavedProgram[]) {
@@ -196,14 +178,26 @@ function policyFor(
   fromWeek: string,
   anchorCycle: number,
   target: number | null,
+  selectedDays?: number[],
 ): StreakPolicy {
   const metadata = scheduleMetadata(p),
-    cycleNumbers = metadata.cycles.map((c) => c.week),
-    cycles = metadata.cycles.map((c) => ({
+    // Explicit weekday settings also work for a program-level routine with no individual templates.
+    sourceCycles = metadata.cycles.length
+      ? metadata.cycles
+      : selectedDays !== undefined
+        ? [{ week: 1, sessions: [] }]
+        : [],
+    cycleNumbers = sourceCycles.map((c) => c.week),
+    cycles = sourceCycles.map((c) => ({
       week: c.week,
+      weekdays:
+        selectedDays ??
+        (c.sessions.length && c.sessions.every((s) => s.day !== null)
+          ? [...new Set(c.sessions.map((s) => s.day!))].sort((a, b) => a - b)
+          : null),
       sessions: c.sessions.map(({ key, name, templateIds }) => ({ key, name, templateIds })),
     })),
-    scheduled = !p.review && metadata.weekly;
+    scheduled = !p.review && (metadata.weekly || selectedDays !== undefined);
   const mode = scheduled ? 'scheduled' : 'manual';
   return {
     id: crypto.randomUUID(),
@@ -214,14 +208,16 @@ function policyFor(
     anchorWeek: fromWeek,
     anchorCycle: cycleNumbers.includes(anchorCycle) ? anchorCycle : cycleNumbers[0] || 1,
     mode,
-    target: mode === 'manual' && !p.review ? target : null,
+    target: target !== null && target <= 7 ? target : null,
     cycles,
     signature: JSON.stringify([
+      'training-days-v2',
       p.id,
       mode,
       p.review || null,
-      mode === 'manual' ? target : null,
-      cycles.map((c) => [c.week, c.sessions.map((s) => [s.key, s.templateIds])]),
+      target,
+      selectedDays ?? null,
+      cycles.map((c) => [c.week, c.weekdays, c.sessions.map((s) => [s.key, s.templateIds])]),
     ]),
   };
 }
@@ -242,7 +238,14 @@ function goalFor(policy: StreakPolicy, week: string): WeekGoal {
     cycleWeek: cycle?.week || 1,
     mode: policy.mode,
     sessions,
-    target: policy.mode === 'scheduled' ? sessions.length || null : policy.target,
+    weekdays: cycle?.weekdays,
+    target:
+      policy.target ??
+      (policy.mode === 'scheduled'
+        ? cycle?.weekdays === undefined
+          ? sessions.length || null
+          : cycle.weekdays?.length || null
+        : null),
   };
 }
 export interface GoalProgress {
@@ -250,6 +253,70 @@ export interface GoalProgress {
   completed: number;
   success: boolean;
   sessions: { name: string; complete: boolean }[];
+  days: TrainingDay[];
+}
+export interface TrainingDay {
+  date: string;
+  weekday: string;
+  scheduled: boolean | null;
+  complete: boolean;
+  today: boolean;
+  state: 'completed' | 'missed' | 'scheduled' | 'rest' | 'unspecified';
+}
+const validDays = (value: unknown): value is number[] =>
+  Array.isArray(value) &&
+  value.every((n) => Number.isInteger(n) && n >= 0 && n <= 6) &&
+  new Set(value).size === value.length;
+function goalWeekdays(goal: WeekGoal, entries: SavedProgram[]): number[] | null {
+  if (goal.weekdays !== undefined) return goal.weekdays;
+  const fromLabels = goal.sessions.map((s) =>
+    s.name.includes(' · ') ? weekdayNumber(s.name.split(' · ')[0]) : null,
+  );
+  if (fromLabels.length && fromLabels.every((d) => d !== null))
+    return [...new Set(fromLabels as number[])].sort((a, b) => a - b);
+  const p = entries.find((p) => p.id === goal.programId);
+  if (p)
+    return scheduleMetadata(p)
+      .cycles.find((c) => c.week === goal.cycleWeek)
+      ?.sessions.every((s) => s.day !== null)
+      ? [
+          ...new Set(
+            scheduleMetadata(p)
+              .cycles.find((c) => c.week === goal.cycleWeek)!
+              .sessions.map((s) => s.day!),
+          ),
+        ].sort((a, b) => a - b)
+      : null;
+  return null;
+}
+function weekCalendar(
+  week: string,
+  weekdays: number[] | null,
+  completed: string[],
+  now: number,
+): TrainingDay[] {
+  const today = localDate(now, STREAK_TIME_ZONE);
+  return WEEKDAYS.map((weekday, index) => {
+    const date = addDays(week, index),
+      scheduled = weekdays === null ? null : weekdays.includes(index),
+      complete = completed.includes(date);
+    return {
+      date,
+      weekday,
+      scheduled,
+      complete,
+      today: date === today,
+      state: complete
+        ? 'completed'
+        : weekdays === null
+          ? 'unspecified'
+          : scheduled
+            ? date < today
+              ? 'missed'
+              : 'scheduled'
+            : 'rest',
+    };
+  });
 }
 export interface WeekProgress {
   week: string;
@@ -270,22 +337,19 @@ export function calculateStreak(data: Data, now = Date.now()): StreakReport {
   if (!s)
     return { current: 0, longest: 0, weeks: [], currentWeek: undefined, earned: {}, ignored: 0 };
   const entries = data.programs || migratePrograms(data).programs!;
-  const idsSeen = new Set<string>(),
-    printsSeen = new Set<string>();
-  const current = calendarWeek(now, s.timeZone),
-    valid = data.history.filter((w) => {
-      if (workoutStreakReason(w, now)) return false;
-      const fingerprint = `${w.programId || ''}:${w.name}:${w.started}`;
-      if (idsSeen.has(w.id) || printsSeen.has(fingerprint)) return false;
-      idsSeen.add(w.id);
-      printsSeen.add(fingerprint);
-      return true;
-    });
-  const ownership = new Map(valid.map((w) => [w, w.programId || historyProgram(w, entries)?.id]));
-  const byWeek = new Map<string, Workout[]>();
+  const idsSeen = new Set<string>();
+  const current = calendarWeek(now, STREAK_TIME_ZONE);
+  const valid = data.history.filter((w) => {
+    if (workoutStreakReason(w, now) || idsSeen.has(w.id)) return false;
+    idsSeen.add(w.id);
+    return true;
+  });
+  const byWeek = new Map<string, Set<string>>();
   for (const w of valid) {
-    const key = calendarWeek(w.finished!, s.timeZone);
-    byWeek.set(key, [...(byWeek.get(key) || []), w]);
+    const date = localDate(w.finished!, STREAK_TIME_ZONE),
+      key = calendarWeek(w.finished!, STREAK_TIME_ZONE);
+    if (!byWeek.has(key)) byWeek.set(key, new Set());
+    byWeek.get(key)!.add(date);
   }
   const records = [...s.weeks];
   if (!records.some((w) => w.week === current)) {
@@ -296,50 +360,36 @@ export function calculateStreak(data: Data, now = Date.now()): StreakReport {
     .filter((w) => w.week <= current)
     .sort((a, b) => a.week.localeCompare(b.week))
     .map((record) => {
-      const inWeek = byWeek.get(record.week) || [];
-      const goals = record.goals.map((goal) => {
-        const history = inWeek.filter((w) => ownership.get(w) === goal.programId);
-        const sessions = goal.sessions.map((session) => ({
-          name: session.name,
-          complete: history.some((w) => session.templateIds.includes(w.name)),
-        }));
-        // A restored/copy session with another ID is still one occurrence. Unscheduled repeats on the same local day do not multiply progress.
-        const fingerprints = new Set<string>(),
-          ids = new Set<string>(),
-          occurrences = new Map<string, string>();
-        for (const w of history) {
-          if (!goal.sessions.some((s) => s.templateIds.includes(w.name))) continue;
-          const fingerprint = `${w.name}:${w.started}`;
-          if (ids.has(w.id) || fingerprints.has(fingerprint)) continue;
-          ids.add(w.id);
-          fingerprints.add(fingerprint);
-          const date = localDate(w.finished!, s.timeZone);
-          occurrences.set(
-            `${w.name}:${date}`,
-            `${goal.sessions.find((s) => s.templateIds.includes(w.name))?.name || w.displayName || w.name} · ${date}`,
-          );
-        }
-        const count =
-          goal.mode === 'scheduled' ? sessions.filter((s) => s.complete).length : occurrences.size;
+      const dates = [...(byWeek.get(record.week) || [])].sort();
+      const goals = record.goals.map((raw) => {
+        const days = goalWeekdays(raw, entries);
+        const target =
+          raw.weekdays === undefined && raw.mode === 'scheduled' && days?.length
+            ? days.length
+            : raw.target;
+        const goal = {
+          ...raw,
+          weekdays: days,
+          target: target !== null && target >= 1 && target <= 7 ? target : null,
+        };
         return {
           goal,
-          completed: goal.target === null ? count : Math.min(goal.target, count),
-          success: goal.target !== null && count >= goal.target,
-          sessions:
-            goal.mode === 'scheduled'
-              ? sessions
-              : [...occurrences.values()].map((name) => ({ name, complete: true })),
+          completed: goal.target === null ? dates.length : Math.min(goal.target, dates.length),
+          success: goal.target !== null && dates.length >= goal.target,
+          sessions: dates.map((date) => ({ name: date, complete: true })),
+          days: weekCalendar(record.week, days, dates, now),
         };
       });
       const chosen =
-        goals.find((g) => g.success) ||
-        [...goals].reverse().find((g) => g.goal.programId === data.activeProgramId) ||
-        goals.at(-1);
-      const status = goals.some((g) => g.success)
+        record.week === current
+          ? [...goals].reverse().find((g) => g.goal.programId === data.activeProgramId) ||
+            goals.at(-1)
+          : goals.at(-1);
+      const status = chosen?.success
         ? 'success'
         : record.week === current
           ? 'pending'
-          : goals.some((g) => g.goal.target !== null)
+          : chosen?.goal.target !== null && chosen?.goal.target !== undefined
             ? 'failed'
             : 'unconfigured';
       return { week: record.week, goals, chosen, status } as WeekProgress;
@@ -364,14 +414,10 @@ export function calculateStreak(data: Data, now = Date.now()): StreakReport {
     weeks,
     currentWeek: weeks.find((w) => w.week === current),
     earned,
-    ignored: data.history.filter(
-      (w) =>
-        workoutStreakReason(w, now) ||
-        (!historyProgram(w, entries) && !s.policies.some((p) => p.programId === w.programId)),
-    ).length,
+    ignored: data.history.filter((w) => workoutStreakReason(w, now)).length,
   };
 }
-/** Requirements are immutable per recorded week. A switch adds an alternative whole-plan goal only to its activation week. */
+/** Retain target snapshots as audit data; date credits are recalculated from saved completions. */
 export function syncStreaks(
   data: Data,
   now = Date.now(),
@@ -391,9 +437,12 @@ export function syncStreaks(
         weeks: [],
         awards: [],
       };
-  const week = calendarWeek(now, s.timeZone);
+  s.timeZone = STREAK_TIME_ZONE;
+  s.rulesVersion = 2;
+  s.trainingDays ||= {};
+  const week = calendarWeek(now, STREAK_TIME_ZONE);
   if (!existing) {
-    // Legacy ownership is accepted only via a stable program ID or an unambiguous exact template ID.
+    // Ownership recovers historical target definitions only; date credit never requires program/template ownership.
     const history = data.history
       .filter((w) => !workoutStreakReason(w, now) && historyProgram(w, entries))
       .sort((a, b) => a.finished! - b.finished!);
@@ -405,7 +454,13 @@ export function syncStreaks(
       const view = programView(p),
         cycle = w.cycleWeek || view.workouts.find((t) => t.id === w.name)?.week || 1;
       s.policies.push(
-        policyFor(p, calendarWeek(w.finished!, s.timeZone), cycle, s.targets[p.id] ?? null),
+        policyFor(
+          p,
+          calendarWeek(w.finished!, s.timeZone),
+          cycle,
+          s.targets[p.id] ?? null,
+          s.trainingDays[p.id],
+        ),
       );
     }
   }
@@ -417,6 +472,7 @@ export function syncStreaks(
       week,
       forceCycle ?? data.rotationWeek ?? 1,
       s.targets[active.id] ?? null,
+      s.trainingDays[active.id],
     );
     if (active.calendar?.enabled) {
       candidate.anchorWeek = calendarWeek(
@@ -434,7 +490,11 @@ export function syncStreaks(
     )
       s.policies.push(candidate);
   }
+  const dates = data.history
+    .filter((w) => !workoutStreakReason(w, now))
+    .map((w) => calendarWeek(w.finished!, STREAK_TIME_ZONE));
   const earliest = [
+    ...dates,
     ...s.policies.map((p) => p.fromWeek),
     ...s.weeks.map((w) => w.week),
     week,
@@ -450,6 +510,8 @@ export function syncStreaks(
     const prior = s.policies.filter((p) => p.fromWeek < date).at(-1);
     const today = s.policies.filter((p) => p.fromWeek === date);
     const policies = [...(prior ? [prior] : []), ...today];
+    // Earlier saved completions remain eligible even when their names/ownership never matched a template.
+    if (!policies.length && s.policies.length) policies.push(s.policies[0]);
     let record = s.weeks.find((w) => w.week === date);
     // Sparse old gaps are represented by immutable policy periods, not thousands of duplicate empty goals.
     if (!record && date < recent && !historyDates.has(date) && !today.length) continue;
@@ -477,20 +539,37 @@ export function syncStreaks(
 }
 export function configureStreak(
   data: Data,
-  options: { timeZone?: string; target?: number; cycleWeek?: number },
+  options: {
+    timeZone?: string;
+    target?: number | null;
+    cycleWeek?: number;
+    weekdays?: number[] | null;
+  },
   now = Date.now(),
 ): Data {
   let next = syncStreaks(data, now);
   if (options.timeZone !== undefined) {
-    if (!validTimeZone(options.timeZone))
-      throw Error('Enter a valid IANA timezone, such as Europe/Vienna.');
-    next.streak!.timeZone = options.timeZone;
+    if (options.timeZone !== STREAK_TIME_ZONE) throw Error('Strength Streak uses Europe/Vienna.');
   }
   if (options.target !== undefined) {
-    if (!Number.isInteger(options.target) || options.target < 1 || options.target > 14)
-      throw Error('Weekly target must be 1–14 workouts.');
+    if (
+      options.target !== null &&
+      (!Number.isInteger(options.target) || options.target < 1 || options.target > 7)
+    )
+      throw Error('Weekly target must be 1–7 training days.');
     if (!next.activeProgramId) throw Error('Select a training program first.');
-    next.streak!.targets[next.activeProgramId] = options.target;
+    if (options.target === null) delete next.streak!.targets[next.activeProgramId];
+    else next.streak!.targets[next.activeProgramId] = options.target;
+  }
+  if (options.weekdays !== undefined) {
+    if (!next.activeProgramId) throw Error('Select a training program first.');
+    if (options.weekdays === null) delete next.streak!.trainingDays![next.activeProgramId];
+    else {
+      if (!validDays(options.weekdays)) throw Error('Choose valid Monday–Sunday training days.');
+      next.streak!.trainingDays![next.activeProgramId] = [...options.weekdays].sort(
+        (a, b) => a - b,
+      );
+    }
   }
   if (
     options.cycleWeek !== undefined &&
@@ -542,6 +621,15 @@ export function assertStreak(value: unknown): asserts value is StreakState {
     !Array.isArray(s.awards)
   )
     throw Error('Invalid Strength Streak backup.');
+  if (
+    (s.rulesVersion !== undefined && s.rulesVersion !== 2) ||
+    (s.trainingDays !== undefined &&
+      (!s.trainingDays ||
+        typeof s.trainingDays !== 'object' ||
+        Array.isArray(s.trainingDays) ||
+        !Object.values(s.trainingDays).every(validDays)))
+  )
+    throw Error('Invalid Strength Streak weekday settings.');
   const ids = new Set<string>();
   for (const p of s.policies) {
     if (
@@ -558,7 +646,13 @@ export function assertStreak(value: unknown): asserts value is StreakState {
       !Number.isInteger(p.anchorCycle) ||
       typeof p.signature !== 'string' ||
       !Array.isArray(p.cycles) ||
-      !p.cycles.every((c) => Number.isInteger(c.week) && c.week > 0 && sessions(c.sessions))
+      !p.cycles.every(
+        (c) =>
+          Number.isInteger(c.week) &&
+          c.week > 0 &&
+          sessions(c.sessions) &&
+          (c.weekdays === undefined || c.weekdays === null || validDays(c.weekdays)),
+      )
     )
       throw Error('Invalid Strength Streak schedule snapshot.');
     ids.add(p.id);
@@ -581,7 +675,7 @@ export function assertStreak(value: unknown): asserts value is StreakState {
           ['scheduled', 'manual'].includes(g.mode) &&
           target(g.target) &&
           sessions(g.sessions) &&
-          (g.mode !== 'scheduled' || g.target === null || g.target === g.sessions.length),
+          (g.weekdays === undefined || g.weekdays === null || validDays(g.weekdays)),
       )
     )
       throw Error('Invalid Strength Streak week snapshot.');
@@ -607,7 +701,9 @@ export function mergeStreaks(a?: StreakState, b?: StreakState): StreakState | un
   if (!a) return b ? structuredClone(b) : undefined;
   if (!b) return structuredClone(a);
   const next = structuredClone(a);
-  next.timeZone = b.timeZone;
+  next.timeZone = STREAK_TIME_ZONE;
+  next.rulesVersion = 2;
+  next.trainingDays = { ...a.trainingDays, ...b.trainingDays };
   next.targets = { ...a.targets, ...b.targets };
   for (const p of b.policies) {
     const old = next.policies.find((x) => x.id === p.id);
