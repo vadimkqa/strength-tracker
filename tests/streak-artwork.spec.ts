@@ -194,6 +194,13 @@ test('52nd valid saved week reveals the secret separately from crystal; failed w
   await expect(page.locator('.streak-celebration')).toHaveCount(0);
   await page.evaluate(() => ((window as any).failArtworkSave = false));
   await page.getByRole('button', { name: 'Retry saving', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Workout Complete', exact: true })).toBeVisible();
+  await expect(page.locator('.completion-secret img')).toHaveAttribute(
+    'src',
+    '/strength-tracker/streak-achievements/12.PNG',
+  );
+  await page.getByRole('button', { name: 'PRs', exact: true }).click();
+  await page.getByRole('tab', { name: 'Strength Streak', exact: true }).click();
   await expect(page.getByTestId('longest-streak')).toHaveText('52 weeks');
   await expect(page.getByLabel('Secret achievement', { exact: true })).toHaveAttribute(
     'data-unlocked',

@@ -1,3 +1,6 @@
+import { WorkoutCompletion } from './WorkoutCompletion';
+import { saveWorkoutCompletion, savedWorkoutName } from './workout-completion';
+import { personalRecords, workoutStatistics, loggedSet } from './workout-results';
 import {
   calculateStreak,
   calendarWeek,
@@ -36,7 +39,6 @@ import {
   loadData,
   saveData,
   createWorkout,
-  finishWorkout,
   newSet,
   formatTime,
   type Data,
@@ -99,7 +101,10 @@ function App() {
     [error, setError] = useState(''),
     [fatal, setFatal] = useState(''),
     [pending, setPending] = useState(0),
-    [restoring, setRestoring] = useState(false);
+    [restoring, setRestoring] = useState(false),
+    [finishing, setFinishing] = useState(false),
+    [summaryId, setSummaryId] = useState<string | null>(null);
+  const completionIntent = useRef<{ id: string; at: number } | null>(null);
   const committed = useRef<Data | null>(null),
     automaticKey = useRef<string | null>(null),
     toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -218,6 +223,7 @@ function App() {
     }
   }
   function showStreak() {
+    setSummaryId(null);
     setRecordView('streak');
     setTab('PRs');
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -225,6 +231,7 @@ function App() {
   function change(fn: (d: Data) => Data) {
     if (!current.current || importing.current) return;
     try {
+      completionIntent.current = null;
       const next = syncStreaks(fn(structuredClone(current.current)));
       current.current = next;
       setData(next);
@@ -246,6 +253,41 @@ function App() {
     } catch (e) {
       setError((e as Error).message);
     }
+  }
+  async function commitCompletion() {
+    const intent = completionIntent.current;
+    if (!intent || !current.current || importing.current) return;
+    // Synchronous lock prevents double taps, queued edits and backup/plan replacement
+    // from changing the session while its final transaction is in flight.
+    importing.current = true;
+    setFinishing(true);
+    setPending((n) => n + 1);
+    try {
+      await queue.current;
+      const next = await saveWorkoutCompletion(current.current, intent.id, intent.at);
+      current.current = next;
+      setData(next);
+      acceptSaved(next);
+      completionIntent.current = null;
+      setError('');
+      setTab('Progress');
+      setSummaryId(intent.id);
+    } catch (e) {
+      setError(
+        'Changes are not saved. Your workout remains active. Retry saving to finish it. ' +
+          String(e),
+      );
+    } finally {
+      importing.current = false;
+      setFinishing(false);
+      setPending((n) => n - 1);
+    }
+  }
+  function requestCompletion() {
+    if (importing.current || !current.current?.active) return;
+    if (!confirm('Finish and save this workout?')) return;
+    completionIntent.current = { id: current.current.active.id, at: Date.now() };
+    void commitCompletion();
   }
   function activeChange(fn: (w: Workout) => Workout) {
     change((d) => ({
@@ -327,23 +369,10 @@ function App() {
       </main>
     );
   const active = data.active,
-    completed = data.history.reduce(
-      (n, w) => n + w.exercises.reduce((t, e) => t + e.sets.filter((s) => s.done).length, 0),
-      0,
-    );
-  const records = new Map<string, { weight: number; reps: number }>();
-  for (const w of data.history)
-    for (const e of w.exercises)
-      for (const s of e.sets)
-        if (s.done) {
-          const old = records.get(e.name);
-          if (
-            !old ||
-            Number(s.weight) > old.weight ||
-            (Number(s.weight) === old.weight && Number(s.reps) > old.reps)
-          )
-            records.set(e.name, { weight: Number(s.weight), reps: Number(s.reps) });
-        }
+    completed = data.history.reduce((n, w) => n + workoutStatistics(w).sets, 0);
+  const records = personalRecords(data.history);
+  const summary =
+    summaryId && savedData?.history.some((w) => w.id === summaryId) ? summaryId : null;
   const cards = carouselWorkouts(
     data.rotation,
     data.rotationWeek,
@@ -375,10 +404,20 @@ function App() {
   return (
     <>
       <main
-        inert={restoring}
-        className={tab === 'Train' ? (active ? 'active-workout' : 'home-screen') : undefined}
+        inert={restoring || finishing}
+        className={
+          summary
+            ? 'completion-screen'
+            : tab === 'Train'
+              ? active
+                ? 'active-workout'
+                : 'home-screen'
+              : undefined
+        }
       >
-        <header className={tab === 'Train' && !active ? 'streak-home-header' : undefined}>
+        <header
+          className={!summary && tab === 'Train' && !active ? 'streak-home-header' : undefined}
+        >
           <div className="brand">
             <img
               className="brand-mark"
@@ -397,7 +436,7 @@ function App() {
           <span className="edition">
             2.0 <span>●</span>
           </span>
-          {tab === 'Train' && !active && (
+          {!summary && tab === 'Train' && !active && (
             <button
               className="streak-indicator"
               aria-label={`Strength Streak, ${streakReport?.current || 0} consecutive ${streakReport?.current === 1 ? 'week' : 'weeks'}`}
@@ -416,11 +455,28 @@ function App() {
         {error && (
           <aside role="alert" className="notice">
             {error}
-            <button onClick={() => change((d) => d)}>Retry saving</button>
+            <button
+              onClick={() =>
+                completionIntent.current ? void commitCompletion() : change((d) => d)
+              }
+            >
+              Retry saving
+            </button>
             <button onClick={exportData}>Export backup</button>
           </aside>
         )}
-        {tab === 'Train' && (
+        {summary && savedData && (
+          <WorkoutCompletion
+            data={savedData}
+            id={summary}
+            done={() => {
+              setSummaryId(null);
+              setCelebration(null);
+              setTab('Train');
+            }}
+          />
+        )}
+        {!summary && tab === 'Train' && (
           <>
             {!active ? (
               cards.length ? (
@@ -631,12 +687,7 @@ function App() {
                     workout={active}
                     now={now}
                     change={activeChange}
-                    finish={() => {
-                      if (confirm('Finish and save this workout?')) {
-                        change((d) => finishWorkout(d));
-                        setTab('Progress');
-                      }
-                    }}
+                    finish={requestCompletion}
                   >
                     <h2 className="visually-hidden">Exercises</h2>
                     {active.exercises.map((ex) => (
@@ -669,12 +720,7 @@ function App() {
                       disabled={
                         active.controller?.phase === 'set' || pendingLogs(active).length > 0
                       }
-                      onClick={() => {
-                        if (confirm('Finish and save this workout?')) {
-                          change((d) => finishWorkout(d));
-                          setTab('Progress');
-                        }
-                      }}
+                      onClick={requestCompletion}
                     >
                       Finish & save workout
                     </button>
@@ -693,7 +739,7 @@ function App() {
             )}
           </>
         )}
-        {tab === 'Progress' && (
+        {!summary && tab === 'Progress' && (
           <>
             <div className="page-title">
               <p className="eyebrow">THE WORK ADDS UP</p>
@@ -737,19 +783,25 @@ function App() {
                         : w.week.toUpperCase()
                       : 'INTENSITY UNSPECIFIED'}
                   </p>
-                  <h3>
-                    {w.displayName ||
-                      data.trainingProgram?.workouts.find((t) => t.id === w.name && !t.legacyKey)
-                        ?.name ||
-                      label(w.name)}
-                  </h3>
+                  <h3>{savedWorkoutName(data, w)}</h3>
                   <p className="muted">
-                    {w.exercises.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0)} sets
-                    ·{' '}
+                    {workoutStatistics(w).sets} sets ·{' '}
                     {w.finished
                       ? formatTime((w.finished - w.started) / 1000)
                       : 'Imported unfinished session'}
                   </p>
+                  {Number.isFinite(w.finished) &&
+                    savedData?.history.some((item) => item.id === w.id) && (
+                      <button
+                        className="history-summary-button"
+                        onClick={() => {
+                          setSummaryId(w.id);
+                          setCelebration(null);
+                        }}
+                      >
+                        View workout summary
+                      </button>
+                    )}
                   <details>
                     <summary>View sets</summary>
                     {w.exercises.map((e, j) => (
@@ -757,7 +809,7 @@ function App() {
                         <b>{e.name}</b>
                         <p className="muted">
                           {e.sets
-                            .filter((s) => s.done)
+                            .filter((s) => loggedSet(e, s))
                             .map((s) => `${s.weight || 0} kg × ${s.reps}`)
                             .join(' · ') || 'No completed sets'}
                         </p>
@@ -803,7 +855,7 @@ function App() {
             )}
           </>
         )}
-        {tab === 'PRs' && (
+        {!summary && tab === 'PRs' && (
           <>
             <div className="segmented record-tabs" role="tablist" aria-label="Record views">
               <button
@@ -867,7 +919,7 @@ function App() {
             )}
           </>
         )}
-        {tab === 'Settings' && (
+        {!summary && tab === 'Settings' && (
           <>
             <div className="page-title">
               <p className="eyebrow">MAKE IT YOURS</p>
@@ -898,7 +950,7 @@ function App() {
             <p className="footnote">STRENGTH TRAINER 2.0 · LOCAL FIRST</p>
           </>
         )}
-        {(celebrating || celebratingSecret) && !active && (
+        {(celebrating || celebratingSecret) && !active && !summary && (
           <aside className="streak-celebration" role="status">
             {celebratingSecret ? (
               <SecretStreakIcon longest={streakReport!.longest} />
@@ -923,9 +975,20 @@ function App() {
           </aside>
         )}
         <p className="save-status" aria-live="polite">
-          {pending ? 'Saving…' : error ? 'Check saving status above' : 'Saved on this device'}
+          {finishing
+            ? 'Saving workout…'
+            : pending
+              ? 'Saving…'
+              : error
+                ? 'Check saving status above'
+                : 'Saved on this device'}
         </p>
       </main>
+      {finishing && (
+        <div className="completion-saving" role="status">
+          Saving your workout…
+        </div>
+      )}
       {restoring && (
         <div className="restore-overlay" role="status">
           Merging your backup safely…
@@ -937,7 +1000,11 @@ function App() {
             key={t}
             className={tab === t ? 'active' : ''}
             aria-current={tab === t ? 'page' : undefined}
-            onClick={() => setTab(t)}
+            disabled={finishing}
+            onClick={() => {
+              setSummaryId(null);
+              setTab(t);
+            }}
           >
             <Icon name={t} />
             <span>{t}</span>
