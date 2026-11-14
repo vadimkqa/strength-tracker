@@ -10,6 +10,7 @@ async function touchDrag(page: Page, from: string, to: string, screenshot?: stri
   const source = page.getByRole('button', { name: `${from} details`, exact: true });
   // CDP coordinates need the same layout stability checks as Playwright's tap action.
   await source.scrollIntoViewIfNeeded();
+  await expect(page.locator('html')).not.toHaveAttribute('data-workout-keyboard', 'true');
   const a = await source.boundingBox();
   const b = await page.getByRole('button', { name: `${to} details`, exact: true }).boundingBox();
   expect(a).toBeTruthy();
@@ -121,6 +122,8 @@ test('short taps, numeric input, scrolling and cancelled hold do not reorder; ke
   await expect(page.getByRole('button', { name: 'Collapse Chest Dip', exact: true })).toBeVisible();
   await page.getByRole('spinbutton', { name: 'Weight Chest Dip set 1', exact: true }).fill('25');
   await expect(page.locator('.exercise-dragging')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Done editing Chest Dip', exact: true }).click();
+  await expect(page.locator('html')).not.toHaveAttribute('data-workout-keyboard', 'true');
   const title = page.getByRole('button', { name: 'Chest Dip details', exact: true });
   await title.scrollIntoViewIfNeeded();
   const b = await title.boundingBox(),
@@ -133,6 +136,8 @@ test('short taps, numeric input, scrolling and cancelled hold do not reorder; ke
   await page.keyboard.press('Escape');
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await cdp.detach();
+  // dnd-kit retains its document click shield for 50ms after cancelling a touch.
+  await page.waitForTimeout(80);
   await expect.poll(() => names(page)).toEqual(original);
   await page
     .getByRole('button', { name: 'Expand Bench Press', exact: true })

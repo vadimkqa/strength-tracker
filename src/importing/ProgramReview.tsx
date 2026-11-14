@@ -62,7 +62,7 @@ export function ProgramReview({ program: p, change, onApply, cancel, stale }: Pr
         <input value={p.name} onChange={(e) => edit((p) => (p.name = e.target.value))} />
       </label>
       <p className="import-stats" role="status">
-        {weeks.length} weeks · {p.workouts.length} sessions ·{' '}
+        {weeks.length} {weeks.length === 1 ? 'week' : 'weeks'} · {p.workouts.length} sessions ·{' '}
         {p.workouts.reduce((n, w) => n + w.exercises.length, 0)} exercises ·{' '}
         {programIssues(p).filter((i) => !i.reviewed).length} unresolved warnings
       </p>
@@ -92,23 +92,25 @@ export function ProgramReview({ program: p, change, onApply, cancel, stale }: Pr
         </details>
       )}
       <div className="import-grid review-selectors">
-        <label>
-          WEEK
-          <select
-            value={week}
-            onChange={(e) => {
-              const week = Number(e.target.value);
-              setWeek(week);
-              setSelected(p.workouts.find((w) => w.week === week)?.id || '');
-            }}
-          >
-            {weeks.map((week) => (
-              <option key={week} value={week}>
-                Week {week}
-              </option>
-            ))}
-          </select>
-        </label>
+        {weeks.length > 1 && (
+          <label>
+            WEEK
+            <select
+              value={week}
+              onChange={(e) => {
+                const week = Number(e.target.value);
+                setWeek(week);
+                setSelected(p.workouts.find((w) => w.week === week)?.id || '');
+              }}
+            >
+              {weeks.map((week) => (
+                <option key={week} value={week}>
+                  Week {week}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label>
           WORKOUT
           <select value={selected} onChange={(e) => setSelected(e.target.value)}>
@@ -223,24 +225,34 @@ export function ProgramReview({ program: p, change, onApply, cancel, stale }: Pr
                   <strong>
                     {index + 1}. {e.name || 'Unnamed exercise'}
                   </strong>
-                  <span>
-                    {e.intensity || 'Intensity unspecified'}
-                    {e.optional ? ' · Optional' : ''}
-                    {e.groupId
-                      ? ` · ${w.groups.find((g) => g.id === e.groupId)?.name || 'Group'}`
-                      : ''}
-                  </span>
+                  {(e.intensity || e.optional || e.groupId) && (
+                    <span>
+                      {[
+                        e.intensity,
+                        e.optional ? 'Optional' : null,
+                        e.groupId
+                          ? w.groups.find((g) => g.id === e.groupId)?.name || 'Group'
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
+                  )}
                   <span className="compact-prescription">
-                    {e.setCount ?? '?'} sets ·{' '}
-                    {e.sets
-                      .map(
-                        (s) =>
-                          `${s.number ?? '?'}: ${s.minReps ?? s.repsText ?? '?'}${s.maxReps !== null && s.maxReps !== s.minReps ? `–${s.maxReps}` : ''} ${s.effort || ''}`,
-                      )
-                      .join(' · ')}
+                    {e.setCount === null ? 'Sets unspecified' : `${e.setCount} sets`} ·{' '}
+                    {e.sets.length
+                      ? e.sets
+                          .map(
+                            (s) =>
+                              `${s.number ?? '?'}: ${s.minReps ?? s.repsText ?? 'unspecified'}${s.maxReps !== null && s.maxReps !== s.minReps ? `–${s.maxReps}` : ''} ${s.effort || ''}`,
+                          )
+                          .join(' · ')
+                      : e.defaultTarget?.minReps != null
+                        ? `${e.defaultTarget.minReps}${e.defaultTarget.maxReps != null && e.defaultTarget.maxReps !== e.defaultTarget.minReps ? `–${e.defaultTarget.maxReps}` : ''} reps`
+                        : e.defaultTarget?.repsText || 'Targets unspecified'}
                   </span>
                   {e.issues.some((i) => !i.reviewed) && (
-                    <span className="compact-warning">Review missing or ambiguous information</span>
+                    <span className="compact-warning">Review source ambiguity</span>
                   )}
                 </div>
               </summary>
@@ -505,9 +517,7 @@ export function ProgramReview({ program: p, change, onApply, cancel, stale }: Pr
                     groupId: null,
                     notes: '',
                     source: [],
-                    issues: [
-                      issue('Review unspecified set count and targets for this manual exercise.'),
-                    ],
+                    issues: [],
                   });
               })
             }

@@ -1,69 +1,75 @@
 import { useEffect } from 'react';
-/** Keep input widths in the layout viewport; use the visual viewport only for occlusion. */
+/** DOMRects and visualViewport bounds are in layout-viewport coordinates. Never translate fixed chrome by keyboard height. */
+export function focusedInputDelta(
+  rect: { top: number; bottom: number },
+  viewport: { offsetTop: number; height: number },
+) {
+  const top = viewport.offsetTop + 8,
+    bottom = viewport.offsetTop + viewport.height - 8;
+  return rect.bottom > bottom ? rect.bottom - bottom : rect.top < top ? rect.top - top : 0;
+}
 export function useKeyboardViewport() {
   useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
+    const vv = window.visualViewport,
+      root = document.documentElement;
     let frame = 0,
-      baselineHeight = innerHeight,
-      baselineWidth = innerWidth,
-      revealFocused = false;
+      release: ReturnType<typeof setTimeout> | undefined,
+      reveal = false;
+    const input = () => {
+      const el = document.activeElement;
+      return el instanceof HTMLElement &&
+        el.closest('.active-workout') &&
+        el.matches(
+          'input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=button]):not([type=submit]),textarea,select,[contenteditable=true]',
+        )
+        ? el
+        : null;
+    };
     const update = (event?: Event) => {
-      if (event?.type === 'focusin' || event?.type === 'resize') revealFocused = true;
+      const focused = input();
+      clearTimeout(release);
+      // Focus, not an estimated keyboard inset, owns editing mode. Also works with hardware keyboards.
+      if (focused) root.dataset.workoutKeyboard = 'true';
+      else if (!document.hidden)
+        release = setTimeout(() => {
+          if (!input() && !document.hidden) {
+            delete root.dataset.workoutKeyboard;
+            window.dispatchEvent(new Event('workout-viewport-change'));
+          }
+        }, 250); // Only debounce chrome restoration during keyboard dismissal; this is not a layout offset.
+      reveal ||=
+        !!focused &&
+        ['focusin', 'resize', 'pageshow', 'visibilitychange'].includes(event?.type || '');
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        const reveal = revealFocused;
-        revealFocused = false;
-        const element = document.activeElement;
-        const focused = element?.matches('input,textarea,select,[contenteditable=true]');
-        const normalScale = Math.abs(vv.scale - 1) < 0.02;
-        if (!focused || Math.abs(innerWidth - baselineWidth) > 20) {
-          baselineHeight = innerHeight;
-          baselineWidth = innerWidth;
-        }
-        const inset =
-          focused && normalScale ? Math.max(0, innerHeight - vv.height - vv.offsetTop) : 0;
-        const workoutInput =
-          element instanceof HTMLElement && element.matches('.active-workout .set-input');
-        const keyboard =
-          workoutInput && normalScale && (inset > 80 || baselineHeight - vv.height > 120);
-        const root = document.documentElement;
-        root.style.setProperty('--keyboard-offset', `${Math.round(inset)}px`);
-        if (keyboard) root.dataset.workoutKeyboard = 'true';
-        else delete root.dataset.workoutKeyboard;
-        // Measure after fixed controls adopt their keyboard position, and scroll only if occluded.
-        if (workoutInput && normalScale && reveal) {
-          const rect = element.getBoundingClientRect();
-          const action = document
-            .querySelector('.workout-floating-action')
-            ?.getBoundingClientRect();
-          const top = vv.offsetTop + 12;
-          const bottom = Math.min(
-            vv.offsetTop + vv.height - 12,
-            action ? action.top - 12 : Infinity,
+        const focused = input(),
+          shouldReveal = reveal;
+        reveal = false;
+        if (focused && shouldReveal && !document.hidden && (!vv || Math.abs(vv.scale - 1) < 0.02)) {
+          const delta = focusedInputDelta(
+            focused.getBoundingClientRect(),
+            vv || { offsetTop: 0, height: innerHeight },
           );
-          const delta =
-            rect.bottom > bottom ? rect.bottom - bottom : rect.top < top ? rect.top - top : 0;
           if (Math.abs(delta) > 2) window.scrollBy({ top: delta, behavior: 'instant' });
         }
         window.dispatchEvent(new Event('workout-viewport-change'));
       });
     };
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    window.addEventListener('focusin', update);
-    window.addEventListener('focusout', update);
-    window.addEventListener('resize', update);
+    vv?.addEventListener('resize', update);
+    vv?.addEventListener('scroll', update);
+    for (const event of ['focusin', 'focusout', 'resize', 'pageshow'])
+      window.addEventListener(event, update);
+    document.addEventListener('visibilitychange', update);
     update();
     return () => {
       cancelAnimationFrame(frame);
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
-      window.removeEventListener('focusin', update);
-      window.removeEventListener('focusout', update);
-      window.removeEventListener('resize', update);
-      document.documentElement.style.removeProperty('--keyboard-offset');
-      delete document.documentElement.dataset.workoutKeyboard;
+      clearTimeout(release);
+      vv?.removeEventListener('resize', update);
+      vv?.removeEventListener('scroll', update);
+      for (const event of ['focusin', 'focusout', 'resize', 'pageshow'])
+        window.removeEventListener(event, update);
+      document.removeEventListener('visibilitychange', update);
+      delete root.dataset.workoutKeyboard;
     };
   }, []);
 }
