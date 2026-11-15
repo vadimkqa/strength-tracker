@@ -49,6 +49,10 @@ it('Nov 14 Week 2 Easy saved session with changed/skipped work counts, without r
   expect(
     carouselCompletions(chooseWeek(other, 2), noon('2026-11-15'))[hammer(d).slotId].completed,
   ).toBe(true);
+  expect(carouselCompletions(d, Date.parse('2026-11-14T22:59Z'))[hammer(d).slotId].completed).toBe(
+    true,
+  );
+  expect(carouselCompletions(d, noon('2026-11-15'), [])[hammer(d).slotId].completed).toBe(false);
   expect(d).toEqual(before);
 });
 
@@ -179,6 +183,26 @@ it('a one-week two-day plan matches its own sessions without inventing extra wee
       p.id,
       { date: '2026-11-20', week: 1, templateIds: [template.id] },
       noon('2026-11-20'),
+    ),
+  ).toBeUndefined();
+  // Sunday late catch-up finishing after Monday midnight belongs to its start week.
+  w.started = Date.parse('2026-11-15T22:30Z');
+  w.finished = Date.parse('2026-11-16T00:15Z');
+  const afterMidnight = Date.parse('2026-11-16T00:16Z');
+  expect(
+    completedOccurrence(
+      d,
+      p.id,
+      { date: '2026-11-13', week: 1, templateIds: [template.id] },
+      afterMidnight,
+    )?.id,
+  ).toBe(w.id);
+  expect(
+    completedOccurrence(
+      d,
+      p.id,
+      { date: '2026-11-20', week: 1, templateIds: [template.id] },
+      afterMidnight,
     ),
   ).toBeUndefined();
 });
