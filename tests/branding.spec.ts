@@ -65,7 +65,7 @@ for (const [width, height] of [
     const colors = await header
       .locator('.brand-wordmark b')
       .evaluateAll((els) => els.map((el) => getComputedStyle(el).color));
-    expect(colors[0]).toBe('rgb(152, 86, 221)');
+    expect(colors[0]).toBe('rgb(166, 149, 194)');
     await header.screenshot({ path: `test-results/branding-header-${width}.png` });
     await page.screenshot({ path: `test-results/branding-home-${width}.png`, fullPage: true });
     for (const tab of ['Progress', 'PRs', 'Settings', 'Train']) {
