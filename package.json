@@ -9,7 +9,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run src",
     "test:e2e": "playwright test",
-    "test:workflow": "node --test --test-isolation=none scripts/automation/*.test.cjs"
+    "test:workflow": "node --test --test-isolation=none scripts/workflow.test.cjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

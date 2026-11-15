@@ -38,7 +38,7 @@ npm run preview -- --port 4173
 # http://localhost:4173/strength-tracker/
 ```
 
-The independent `Mobile reliability regressions` CI workflow runs the full Chromium suite and the targeted keyboard/import/reorder tests in Playwright WebKit. It does not change the Pages deployment workflow or enable auto-merge. Run the WebKit target locally where installed with:
+The `Deploy GitHub Pages` CI workflow runs the full Chromium suite and targeted keyboard/import/reorder tests in Playwright WebKit before publishing. It never enables auto-merge. Run the WebKit target locally where installed with:
 
 ```sh
 npx playwright install --with-deps webkit

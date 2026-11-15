@@ -278,4 +278,4 @@ Regressions cover all eight real GYM.txt sessions, both wrap directions, alterna
 
 ### Development and automatic merging
 
-Future updates use feature branches and PRs with a guarded, opt-in auto-merge policy. CI checks TypeScript, production build, unit tests and mobile browser workflows before a protected merge; sensitive data/history/streak work requires manual review. Administrative setup is required before activation. See [development workflow and exact GitHub setup](docs/DEVELOPMENT_WORKFLOW.md) and [agent instructions](AGENTS.md).
+Use feature branches and PRs. GitHub runs the production build, unit tests and Chromium/WebKit mobile tests before merging. Low-risk updates can use native squash auto-merge only after all three required checks are enforced on `main`; high-risk data and governance changes stay open for manual review. Pages deploys merged changes after the same checks pass. No custom approval workflow is used. See [GitHub setup and merge instructions](docs/DEVELOPMENT_WORKFLOW.md) and [agent instructions](AGENTS.md).
