@@ -15,6 +15,7 @@ import {
   applyAutomaticSelection,
   automaticSelectionKey,
   calendarStatus,
+  carouselCompletions,
   matchesSuggestion,
   suggestWorkout,
 } from './auto-selection';
@@ -208,6 +209,9 @@ function App() {
     const previous = committed.current;
     committed.current = d;
     setSavedData(d);
+    // A just-saved finish can be newer than the last 1s UI clock tick.
+    // Refresh atomically with committed history so it is not briefly treated as future/incomplete.
+    setNow(Date.now());
     if (!animate || !previous) return;
     const fresh = d.streak?.awards.filter(
       (a) => a.valid && !previous.streak?.awards.some((old) => old.id === a.id && old.valid),
@@ -396,7 +400,13 @@ function App() {
       );
   const selectedIntensity = workoutDifficulty(data, index);
   const suggestion = savedData ? suggestWorkout(savedData, now) : null;
-  const context = matchesSuggestion(data, suggestion) ? suggestion?.kind : null;
+  const completions = carouselCompletions(data, now, savedData?.history || []);
+  const selectedCompletion = completions[cards[index]?.key];
+  const context = selectedCompletion?.completed
+    ? 'Completed'
+    : matchesSuggestion(data, suggestion)
+      ? suggestion?.kind
+      : null;
   const streakReport = savedData ? calculateStreak(savedData, now) : null;
   const streakLevel = levelFor(streakReport?.current || 0);
   const celebrating = STREAK_LEVELS.find((l) => l.id === celebration);
@@ -525,6 +535,7 @@ function App() {
                     </p>
                   )}
                   <WorkoutCarousel
+                    completions={completions}
                     dayOverrides={currentProgram(data)?.calendar?.days}
                     ref={carousel}
                     selected={index}
@@ -588,7 +599,14 @@ function App() {
                       ((!!data.rotation || !!programTemplate) &&
                         (!rotationSession || !data.plan[rotationSession.key]))
                     }
-                    onClick={() =>
+                    onClick={() => {
+                      if (
+                        selectedCompletion?.completed &&
+                        !confirm(
+                          'This scheduled workout is already completed. Start a separate repeat workout? Your saved session will stay unchanged.',
+                        )
+                      )
+                        return;
                       change((d) => ({
                         ...d,
                         active: {
@@ -614,12 +632,10 @@ function App() {
                                 d.history,
                               )),
                           programId: d.activeProgramId,
-                          ...(matchesSuggestion(d, suggestion)
-                            ? { scheduledFor: suggestion!.date }
-                            : {}),
+                          ...(selectedCompletion ? { scheduledFor: selectedCompletion.date } : {}),
                         },
-                      }))
-                    }
+                      }));
+                    }}
                   >
                     START WORKOUT <span>→</span>
                   </button>

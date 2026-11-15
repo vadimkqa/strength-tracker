@@ -8,11 +8,13 @@ import {
 } from 'react';
 import { carouselWorkouts, templateKey, type Rotation } from './workouts';
 import type { TrainingProgram } from './importing/model';
+import type { CardCompletion } from './auto-selection';
 import type { Plan } from './templates';
 export interface CarouselHandle {
   select: (index: number) => void;
 }
 interface Props {
+  completions?: Record<string, CardCompletion>;
   dayOverrides?: Record<string, number>;
   children?: ReactNode;
   ref?: Ref<CarouselHandle>;
@@ -37,6 +39,7 @@ export function WorkoutCarousel({
   preferredIntensity,
   children,
   dayOverrides,
+  completions,
 }: Props) {
   const workouts = carouselWorkouts(
     rotation,
@@ -161,7 +164,7 @@ export function WorkoutCarousel({
             <article
               key={card.key}
               data-card-index={index}
-              className={`workout-card stack-card stack-${position} ${distance === 0 ? 'selected' : ''}`}
+              className={`workout-card stack-card stack-${position} ${distance === 0 ? 'selected' : ''} ${completions?.[card.key]?.completed ? 'is-completed' : ''}`}
               aria-label={card.name}
               aria-hidden={position === 'back' || undefined}
               style={{ '--drag-x': distance === 0 ? `${offset}px` : '0px' } as CSSProperties}
@@ -186,6 +189,7 @@ export function WorkoutCarousel({
                 }}
               />
               <span className="stack-peek-label" aria-hidden="true">
+                {completions?.[card.key]?.completed && <span className="peek-completion">✓</span>}
                 {card.name}
               </span>
               <div className="stack-card-top">
@@ -200,6 +204,17 @@ export function WorkoutCarousel({
                   src={`${import.meta.env.BASE_URL}photos/${card.photo}.jpg`}
                   alt={card.caption}
                 />
+                {completions?.[card.key]?.completed && (
+                  <span
+                    className="card-completion"
+                    aria-label={`${card.name} completed for ${completions[card.key].date}`}
+                  >
+                    <span className="completion-check" aria-hidden="true">
+                      ✓
+                    </span>
+                    <span className="completion-label">Completed</span>
+                  </span>
+                )}
                 <span className="stack-intensity">
                   {intensity
                     ? /^(hard|heavy)$/i.test(intensity)
