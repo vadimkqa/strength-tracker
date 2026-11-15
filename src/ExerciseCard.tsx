@@ -1,3 +1,4 @@
+import { advanceSetInput } from './SetInputNavigation';
 import { removeLiveSet } from './live-sets';
 import { useState } from 'react';
 import type { Exercise, Workout } from './data';
@@ -186,6 +187,15 @@ export function ExerciseCard({ workout: w, exercise: e, change, sort }: Props) {
                     aria-label={`${field === 'weight' ? 'Weight' : 'Reps'} ${e.name} set ${index + 1}`}
                     type="number"
                     inputMode={field === 'weight' ? 'decimal' : 'numeric'}
+                    enterKeyHint={
+                      field === 'weight' && index === e.sets.length - 1 ? 'done' : 'next'
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      advanceSetInput(event.currentTarget);
+                    }}
                     min="0"
                     step={field === 'weight' ? '0.5' : '1'}
                     value={s[field]}

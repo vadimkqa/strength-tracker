@@ -3,9 +3,10 @@ import { useEffect } from 'react';
 export function focusedInputDelta(
   rect: { top: number; bottom: number },
   viewport: { offsetTop: number; height: number },
+  occlusionTop = Infinity,
 ) {
   const top = viewport.offsetTop + 8,
-    bottom = viewport.offsetTop + viewport.height - 8;
+    bottom = Math.min(viewport.offsetTop + viewport.height, occlusionTop) - 8;
   // Browser scroll positions can round to whole CSS pixels; round outward so the safety gap survives.
   return rect.bottom > bottom
     ? Math.ceil(rect.bottom - bottom)
@@ -44,7 +45,9 @@ export function useKeyboardViewport() {
         }, 250); // Only debounce chrome restoration during keyboard dismissal; this is not a layout offset.
       reveal ||=
         !!focused &&
-        ['focusin', 'resize', 'pageshow', 'visibilitychange'].includes(event?.type || '');
+        ['focusin', 'resize', 'pageshow', 'visibilitychange', 'workout-input-navigation'].includes(
+          event?.type || '',
+        );
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         const focused = input(),
@@ -54,6 +57,7 @@ export function useKeyboardViewport() {
           const delta = focusedInputDelta(
             focused.getBoundingClientRect(),
             vv || { offsetTop: 0, height: innerHeight },
+            document.querySelector('.set-input-navigation')?.getBoundingClientRect().top,
           );
           if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
         }
@@ -62,7 +66,7 @@ export function useKeyboardViewport() {
     };
     vv?.addEventListener('resize', update);
     vv?.addEventListener('scroll', update);
-    for (const event of ['focusin', 'focusout', 'resize', 'pageshow'])
+    for (const event of ['focusin', 'focusout', 'resize', 'pageshow', 'workout-input-navigation'])
       window.addEventListener(event, update);
     document.addEventListener('visibilitychange', update);
     update();
@@ -71,7 +75,7 @@ export function useKeyboardViewport() {
       clearTimeout(release);
       vv?.removeEventListener('resize', update);
       vv?.removeEventListener('scroll', update);
-      for (const event of ['focusin', 'focusout', 'resize', 'pageshow'])
+      for (const event of ['focusin', 'focusout', 'resize', 'pageshow', 'workout-input-navigation'])
         window.removeEventListener(event, update);
       document.removeEventListener('visibilitychange', update);
       delete root.dataset.workoutKeyboard;

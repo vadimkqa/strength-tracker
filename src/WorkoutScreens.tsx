@@ -1,3 +1,4 @@
+import { SetInputNavigation } from './SetInputNavigation';
 import { TimerBubble } from './TimerBubble';
 import { useDndContext } from '@dnd-kit/core';
 import { useRef, type ReactNode } from 'react';
@@ -84,6 +85,7 @@ export function WorkoutScreens({ workout: w, now, change, finish, children }: Pr
         }
       }}
     >
+      {c.screen === 'exercises' && <SetInputNavigation />}
       <div className="workout-navigation">
         <div className="workout-screen-tabs" role="tablist" aria-label="Workout screens">
           {(['exercises', 'timer'] as const).map((s) => (

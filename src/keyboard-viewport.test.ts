@@ -15,3 +15,10 @@ it('rounds fractional reveal distances outward for WebKit scroll-position roundi
     -1,
   );
 });
+
+it('reveals inputs above the measured Next/Done accessory without changing viewport sizing', () => {
+  expect(focusedInputDelta({ top: 360, bottom: 404 }, { offsetTop: 50, height: 400 }, 398)).toBe(
+    14,
+  );
+  expect(focusedInputDelta({ top: 340, bottom: 384 }, { offsetTop: 50, height: 400 }, 398)).toBe(0);
+});
