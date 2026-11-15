@@ -3128,3 +3128,30 @@ html[data-workout-keyboard='true'] {
 html[data-workout-keyboard='true'] .live-set-controls button {
   scroll-margin-block: 8px;
 }
+
+/* A small input accessory follows the visible viewport in document coordinates.
+   It never changes navigation offsets, content sizing or the root scroll container. */
+.set-input-navigation {
+  position: absolute;
+  z-index: 120;
+  width: 104px;
+  height: 44px;
+  transform: translate(
+    calc(-1 * env(safe-area-inset-right)),
+    calc(-1 * env(safe-area-inset-bottom))
+  );
+}
+.set-input-navigation button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 44px;
+  padding: 8px 12px;
+  border-color: var(--purple);
+  background: #241a30;
+  box-shadow: 0 3px 12px #0b081088;
+  font-size: 16px;
+  touch-action: manipulation;
+}
