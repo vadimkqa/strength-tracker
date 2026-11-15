@@ -224,7 +224,7 @@ export function BackupPanel({ data, ready, onRestore }: Props) {
           <p className="muted">
             Validated JSON. Restore merges workout history, updates matching plans and settings, and
             keeps your current workout. Existing data and snapshots are kept; a pre-restore safety
-            snapshot is saved.
+            snapshot is saved. PR favorites are combined, keeping your current order first.
           </p>
           <label className="checkbox-label">
             <input

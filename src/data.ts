@@ -1,3 +1,8 @@
+import {
+  assertRecordPreferences,
+  mergeRecordPreferences,
+  type RecordPreferences,
+} from './record-preferences';
 import { assertStreak, mergeStreaks, syncStreaks, type StreakState } from './streak';
 import { assertLibrary, migratePrograms, mergePrograms, type SavedProgram } from './programs';
 import { assertProgram, type TrainingProgram } from './importing/model';
@@ -58,6 +63,7 @@ export interface Workout {
   exercises: Exercise[];
 }
 export interface Data {
+  prPreferences?: RecordPreferences;
   streak?: StreakState;
   programs?: SavedProgram[];
   activeProgramId?: string;
@@ -132,6 +138,7 @@ export function parseData(input: unknown): Data {
     throw Error('Invalid workout plan.');
   if (d.trainingProgram) assertProgram(d.trainingProgram);
   assertLibrary(d);
+  assertRecordPreferences(d.prPreferences);
   if (d.streak !== undefined) assertStreak(d.streak);
   if (
     d.rotation &&
@@ -300,6 +307,7 @@ export function mergeBackup(current: Data, incoming: Data): Data {
     ...current,
     ...incoming,
     ...projection,
+    prPreferences: mergeRecordPreferences(current.prPreferences, incoming.prPreferences),
     streak,
     active,
     history: history.sort((a, b) => b.started - a.started),
