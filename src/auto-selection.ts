@@ -2,8 +2,8 @@ import type { Data, Workout } from './data';
 import { currentProgram, programView, rememberProgram } from './programs';
 import { scheduleMetadata } from './program-schedule';
 import { addDays, localDate, monday, cycleForDate, assertCalendar } from './calendar';
-import { historyProgram } from './streak';
-import { calendarCompletionReason as workoutStreakReason } from './calendar-completion';
+import { STREAK_TIME_ZONE } from './streak';
+import { completedOccurrence, calendarCompletionReason } from './calendar-completion';
 import { carouselWorkouts } from './workouts';
 export interface WorkoutSuggestion {
   date: string;
@@ -27,17 +27,14 @@ export function calendarStatus(data: Data) {
     return 'Review the calendar anchor: its program week is no longer available.';
   return null;
 }
-export function suggestWorkout(
-  data: Data,
-  now = Date.now(),
-  history: Workout[] = data.history,
-): WorkoutSuggestion | null {
-  if (calendarStatus(data)) return null;
+export function scheduledOccurrences(data: Data, now = Date.now()): WorkoutSuggestion[] {
+  const entry = currentProgram(data);
+  if (!entry?.calendar || entry.review || !scheduleMetadata(entry).hasWeekdays) return [];
   const p = currentProgram(data)!,
     config = p.calendar!,
     metadata = scheduleMetadata(p),
     weeks = metadata.cycles.map((c) => c.week),
-    zone = data.streak?.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    zone = STREAK_TIME_ZONE,
     today = localDate(now, zone),
     currentMonday = monday(today);
   const occurrences: WorkoutSuggestion[] = [];
@@ -64,19 +61,18 @@ export function suggestWorkout(
     }
   }
   occurrences.sort((a, b) => a.date.localeCompare(b.date));
-  const valid = history.filter(
-    (w) =>
-      !workoutStreakReason(w, now) &&
-      (w.programId ? w.programId === p.id : historyProgram(w, data.programs || [])?.id === p.id),
-  );
-  const isComplete = (s: WorkoutSuggestion) =>
-    valid.some(
-      (w) =>
-        s.templateIds.includes(w.name) &&
-        (w.scheduledFor
-          ? w.scheduledFor === s.date
-          : monday(localDate(w.finished!, zone)) === monday(s.date)),
-    );
+  return occurrences;
+}
+export function suggestWorkout(
+  data: Data,
+  now = Date.now(),
+  history: Workout[] = data.history,
+): WorkoutSuggestion | null {
+  if (calendarStatus(data)) return null;
+  const p = currentProgram(data)!,
+    today = localDate(now, STREAK_TIME_ZONE),
+    occurrences = scheduledOccurrences(data, now);
+  const isComplete = (s: WorkoutSuggestion) => !!completedOccurrence(data, p.id, s, now, history);
   const scheduledToday = occurrences.filter((s) => s.date === today);
   const todayUnfinished = scheduledToday.find((s) => !isComplete(s));
   if (todayUnfinished) return todayUnfinished;
@@ -87,6 +83,36 @@ export function suggestWorkout(
     if (catchup) return catchup;
   }
   return occurrences.find((s) => s.date > today && !isComplete(s)) || null;
+}
+export interface CardCompletion {
+  date: string;
+  completed: boolean;
+}
+export function carouselCompletions(
+  data: Data,
+  now = Date.now(),
+  history: Workout[] = data.history,
+): Record<string, CardCompletion> {
+  const p = currentProgram(data);
+  if (!p) return {};
+  const week = data.rotationWeek || 1,
+    todayMonday = monday(localDate(now, STREAK_TIME_ZONE)),
+    occurrences = scheduledOccurrences(data, now).filter((s) => s.week === week),
+    suggestion = suggestWorkout(data, now, history);
+  const viewMonday = occurrences.some((s) => monday(s.date) === todayMonday)
+    ? todayMonday
+    : suggestion?.week === week
+      ? monday(suggestion.date)
+      : occurrences.filter((s) => monday(s.date) < todayMonday).at(-1)?.date;
+  if (!viewMonday) return {};
+  return Object.fromEntries(
+    occurrences
+      .filter((s) => monday(s.date) === monday(viewMonday))
+      .map((s) => [
+        s.slotId,
+        { date: s.date, completed: !!completedOccurrence(data, p.id, s, now, history) },
+      ]),
+  );
 }
 export function matchesSuggestion(data: Data, suggestion: WorkoutSuggestion | null) {
   if (!suggestion || data.rotationWeek !== suggestion.week) return false;
@@ -122,7 +148,7 @@ export function applyAutomaticSelection(
   return rememberProgram(structuredClone(next));
 }
 export function automaticSelectionKey(data: Data, now: number) {
-  const zone = data.streak?.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const zone = STREAK_TIME_ZONE;
   return JSON.stringify([
     localDate(now, zone),
     zone,
@@ -134,7 +160,9 @@ export function automaticSelectionKey(data: Data, now: number) {
       w.name,
       w.programId,
       w.scheduledFor,
-      workoutStreakReason(w, now),
+      w.started,
+      w.cycleWeek,
+      calendarCompletionReason(w, now),
     ]),
   ]);
 }

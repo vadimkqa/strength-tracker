@@ -90,7 +90,6 @@ it('only valid saved history from the exact program/template suppresses a sugges
   for (const invalid of [
     { ...valid, finished: undefined },
     { ...valid, programId: 'other' },
-    { ...valid, streakExcluded: true },
     { ...valid, isTest: true },
     { ...valid, cancelled: true },
     { ...valid, name: 'similar but different' },
@@ -289,7 +288,7 @@ it('saving an incomplete/test workout triggers review but never consumes its sch
     now = noon('2026-11-14');
   const key = automaticSelectionKey(d, now);
   const w = savedSession(d, 1, 'Saturday', '2026-11-14');
-  w.streakExcluded = true;
+  w.isTest = true;
   d.history = [w];
   expect(automaticSelectionKey(d, now)).not.toBe(key);
   expect(suggestWorkout(d, now)).toMatchObject({ date: '2026-11-14', kind: "TODAY'S WORKOUT" });

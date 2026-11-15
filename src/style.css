@@ -3155,3 +3155,67 @@ html[data-workout-keyboard='true'] .live-set-controls button {
   font-size: 16px;
   touch-action: manipulation;
 }
+
+/* Completion accents leave photographs and the purple playing-card design intact. */
+.stack-card.is-completed:not(.stack-front) .photo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgb(17 94 65 / 18%);
+  pointer-events: none;
+}
+.card-completion {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid #579d785c;
+  border-radius: 9px;
+  background: #10271fe8;
+  color: #a8e3bf;
+  font-size: 11px;
+  font-weight: 600;
+}
+.completion-check {
+  width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #215a40;
+}
+.stack-card:not(.stack-front) .completion-label {
+  display: none;
+}
+.stack-card:not(.stack-front) .card-completion {
+  padding: 4px;
+}
+.stack-card.is-completed .stack-intensity {
+  z-index: 2;
+}
+
+.stack-next .card-completion {
+  left: auto;
+  right: 10px;
+}
+
+.peek-completion {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-bottom: 6px;
+  writing-mode: horizontal-tb;
+  letter-spacing: 0;
+  color: #b3edca;
+  border: 1px solid #579d7877;
+  border-radius: 50%;
+  background: #183e2f;
+}
+.stack-previous .peek-completion {
+  transform: rotate(180deg);
+}

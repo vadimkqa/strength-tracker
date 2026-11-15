@@ -1,9 +1,10 @@
-import type { Workout } from './data';
+import type { Data, Workout } from './data';
 import { validLog } from './controller';
-/** Calendar suggestion eligibility is intentionally unchanged by training-day streak rules. */
+import { historyProgram, STREAK_TIME_ZONE } from './streak';
+import { localDate, monday } from './calendar';
+/** A saved performed session need not reproduce every planned exercise/set. */
 export function calendarCompletionReason(w: Workout, now = Date.now()): string | null {
   if (
-    w.streakExcluded === true ||
     w.isTest === true ||
     w.cancelled === true ||
     w.abandoned === true ||
@@ -11,7 +12,7 @@ export function calendarCompletionReason(w: Workout, now = Date.now()): string |
       typeof w.status === 'string' ? w.status.toLowerCase() : '',
     )
   )
-    return 'Excluded practice, test or cancelled session';
+    return 'Excluded test or cancelled session';
   if (
     !Number.isFinite(w.started) ||
     !Number.isFinite(w.finished) ||
@@ -33,14 +34,30 @@ export function calendarCompletionReason(w: Workout, now = Date.now()): string |
     )
   )
     return 'Invalid or unresolved completed logging';
-  for (const e of w.exercises) {
-    if (e.optional) continue;
-    if (
-      e.skipped ||
-      !e.sets.length ||
-      e.sets.some((s) => !s.done || s.skipped || s.needsLogging || !validLog(s))
-    )
-      return 'Required exercises or sets are unfinished';
-  }
   return null;
+}
+
+export interface ScheduledOccurrence {
+  date: string;
+  week: number;
+  templateIds: string[];
+}
+/** Exact identities and occurrence dates only. Never compare display names or exercise lists. */
+export function completedOccurrence(
+  data: Data,
+  programId: string,
+  occurrence: ScheduledOccurrence,
+  now = Date.now(),
+  history: Workout[] = data.history,
+) {
+  return history.find((w) => {
+    if ((w.programId || historyProgram(w, data.programs || [])?.id) !== programId) return false;
+    if (!occurrence.templateIds.includes(w.name)) return false;
+    if (w.cycleWeek !== undefined && w.cycleWeek !== occurrence.week) return false;
+    if (calendarCompletionReason(w, now)) return false;
+    if (w.scheduledFor) return w.scheduledFor === occurrence.date;
+    // Legacy records lack scheduledFor. The exact template + local start week identifies
+    // the occurrence, including a session that finishes after midnight. No records are changed.
+    return monday(localDate(w.started, STREAK_TIME_ZONE)) === monday(occurrence.date);
+  });
 }
