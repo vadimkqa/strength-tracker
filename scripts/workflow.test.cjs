@@ -13,7 +13,10 @@ test('production build retains workflow tests, unit tests and TypeScript checkin
   assert.match(build, /run: npm run build/);
   const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
   assert.match(pkg.scripts.build, /tsc --noEmit && vite build/);
-  assert.equal(pkg.scripts['test:workflow'], 'node --test --test-isolation=none scripts/workflow.test.cjs');
+  assert.equal(
+    pkg.scripts['test:workflow'],
+    'node --test --test-isolation=none scripts/workflow.test.cjs',
+  );
 });
 
 test('both mobile engines test the exact production artifact with failure artifacts retained', () => {
