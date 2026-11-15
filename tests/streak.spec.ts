@@ -43,6 +43,9 @@ for (const [width, height] of [
     await expect(
       page.getByRole('heading', { name: 'Personal records.', exact: true }),
     ).toBeVisible();
+    const exercise = page.getByRole('button', { name: 'View records for Press 1', exact: true });
+    await expect(exercise).toBeVisible();
+    await exercise.click();
     await expect(page.getByRole('heading', { name: 'Press 1', exact: true })).toBeVisible();
     await expect(page.locator('.achievement-collection')).toHaveCount(0);
   });
