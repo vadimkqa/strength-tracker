@@ -9,6 +9,7 @@ export default defineConfig({
           '**/mobile-reliability.spec.ts',
           '**/set-input-navigation.spec.ts',
           '**/carousel-completion.spec.ts',
+          '**/records.spec.ts',
         ]
       : undefined,
   use: { ...base.use, browserName, launchOptions: {} },

@@ -1,6 +1,7 @@
+import { RecordsDashboard } from './RecordsDashboard';
 import { WorkoutCompletion } from './WorkoutCompletion';
 import { saveWorkoutCompletion, savedWorkoutName } from './workout-completion';
-import { personalRecords, workoutStatistics, loggedSet } from './workout-results';
+import { workoutStatistics, loggedSet } from './workout-results';
 import {
   calculateStreak,
   calendarWeek,
@@ -374,7 +375,7 @@ function App() {
     );
   const active = data.active,
     completed = data.history.reduce((n, w) => n + workoutStatistics(w).sets, 0);
-  const records = personalRecords(data.history);
+
   const summary =
     summaryId && savedData?.history.some((w) => w.id === summaryId) ? summaryId : null;
   const cards = carouselWorkouts(
@@ -904,33 +905,12 @@ function App() {
               />
             ) : (
               <div role="tabpanel" id="prs-weights-panel" aria-labelledby="prs-weights-tab">
-                <div className="page-title">
-                  <p className="eyebrow">PROOF OF YOUR EFFORT</p>
-                  <h1>Personal records.</h1>
-                  <p>Your best completed sets, by exercise.</p>
-                </div>
-                {records.size === 0 ? (
-                  <section className="card empty">
-                    <Icon name="PRs" />
-                    <h3>Great things take reps.</h3>
-                    <p>Log a set and finish your workout to earn your first record.</p>
-                    <button onClick={() => setTab('Train')}>Start training →</button>
-                  </section>
-                ) : (
-                  [...records].map(([name, r]) => (
-                    <section className="card row" key={name}>
-                      <div>
-                        <p className="eyebrow">BEST WEIGHT</p>
-                        <h3>{name}</h3>
-                        <p className="muted">{r.reps} reps</p>
-                      </div>
-                      <strong className="record">
-                        {r.weight}
-                        <small> kg</small>
-                      </strong>
-                    </section>
-                  ))
-                )}
+                <RecordsDashboard
+                  data={data}
+                  change={change}
+                  now={now}
+                  busy={!!pending || restoring}
+                />
               </div>
             )}
           </>
