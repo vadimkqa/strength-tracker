@@ -1,3 +1,4 @@
+import { normalizedWeight, weightDraft, weightValue } from './weight';
 import { advanceSetInput } from './SetInputNavigation';
 import { removeLiveSet } from './live-sets';
 import { useState } from 'react';
@@ -185,7 +186,13 @@ export function ExerciseCard({ workout: w, exercise: e, change, sort }: Props) {
                     className="set-input"
                     key={field}
                     aria-label={`${field === 'weight' ? 'Weight' : 'Reps'} ${e.name} set ${index + 1}`}
-                    type="number"
+                    type={field === 'weight' ? 'text' : 'number'}
+                    data-set-field={field}
+                    aria-invalid={
+                      field === 'weight' && s.weight !== '' && weightValue(s.weight) === null
+                        ? true
+                        : undefined
+                    }
                     inputMode={field === 'weight' ? 'decimal' : 'numeric'}
                     enterKeyHint={
                       field === 'weight' && index === e.sets.length - 1 ? 'done' : 'next'
@@ -197,18 +204,26 @@ export function ExerciseCard({ workout: w, exercise: e, change, sort }: Props) {
                       advanceSetInput(event.currentTarget);
                     }}
                     min="0"
-                    step={field === 'weight' ? '0.5' : '1'}
+                    step={field === 'reps' ? '1' : undefined}
                     value={s[field]}
                     onChange={(event) =>
                       set(s.id!, (s) => {
-                        s[field] = event.target.value;
+                        s[field] =
+                          field === 'weight' ? weightDraft(event.target.value) : event.target.value;
                         if (s.done && !validLog(s)) {
                           s.done = false;
                           s.needsLogging = true;
                         }
                       })
                     }
-                    onBlur={() => requestAnimationFrame(() => change((w) => w))}
+                    onBlur={() => {
+                      if (field === 'weight')
+                        set(s.id!, (entry) => {
+                          const normalized = normalizedWeight(entry.weight);
+                          if (normalized !== null) entry.weight = normalized;
+                        });
+                      requestAnimationFrame(() => change((w) => w));
+                    }}
                   />
                 ))}
                 <button
@@ -247,6 +262,11 @@ export function ExerciseCard({ workout: w, exercise: e, change, sort }: Props) {
                   )}
                 </button>
                 <div className="set-details">
+                  {s.weight !== '' && weightValue(s.weight) === null && (
+                    <small className="weight-entry-error" role="status">
+                      Use 0 or positive kg with up to 3 decimal places.
+                    </small>
+                  )}
                   <span className="previous-set">
                     {previous
                       ? `Last: ${previous.weight} kg × ${previous.reps}`

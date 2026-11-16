@@ -1,3 +1,4 @@
+import { weightValue, weightVolume, sumVolumes } from './weight';
 import type { Exercise, Workout } from './data';
 import { exerciseIdentity } from './performance';
 import { beatsRecord, loggedSet, type PersonalRecord } from './workout-results';
@@ -90,7 +91,7 @@ export function exerciseRecords(
           groups.set(id, group);
         }
         group.names.add(e.name);
-        const weight = Number(s.weight),
+        const weight = weightValue(s.weight)!,
           reps = Number(s.reps);
         group.history.push({
           weight,
@@ -101,7 +102,10 @@ export function exerciseRecords(
           intensity: session,
           kind,
           estimate: estimatedOneRM(weight, reps, kind),
-          volume: kind === 'assisted' || !Number.isFinite(weight * reps) ? null : weight * reps,
+          volume:
+            kind === 'assisted' || !Number.isFinite(weightVolume(s.weight, reps))
+              ? null
+              : weightVolume(s.weight, reps),
           prs: { weight: false, reps: false, strength: false },
         });
       }
@@ -220,7 +224,7 @@ export function chartPoints(
       workoutId: p.workoutId,
       value: prior
         ? metric === 'volume'
-          ? prior.value + value
+          ? sumVolumes([prior.value, value])
           : Math.max(prior.value, value)
         : value,
     });

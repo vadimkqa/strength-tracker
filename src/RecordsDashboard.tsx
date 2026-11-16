@@ -15,7 +15,7 @@ import {
   type SessionFilter,
 } from './records';
 const number = (n: number) =>
-  new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(n);
+  new Intl.NumberFormat(undefined, { maximumFractionDigits: 3 }).format(n);
 const date = (n: number) =>
   new Date(n).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 function load(p: Performance) {

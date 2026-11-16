@@ -73,7 +73,7 @@ export function WorkoutCompletion({
         <div>
           <dt>Volume</dt>
           <dd data-testid="completion-volume">
-            {receipt.volume.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+            {receipt.volume.toLocaleString(undefined, { maximumFractionDigits: 3 })}
             <small>kg</small>
           </dd>
         </div>

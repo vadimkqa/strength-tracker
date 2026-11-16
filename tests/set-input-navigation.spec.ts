@@ -8,7 +8,9 @@ import { advanceClock, beginCards, stored } from './exercise-fixture';
 const input = (page: Page, field: 'Reps' | 'Weight', set: number, exercise = 'Bench Press') =>
   page.getByLabel(`${field} ${exercise} set ${set}`, { exact: true });
 const next = (page: Page) =>
-  page.getByRole('group', { name: 'Set input navigation' }).getByRole('button');
+  page
+    .getByRole('group', { name: 'Set input navigation' })
+    .getByRole('button', { name: /^(Next:|Done entering)/ });
 async function occlude(page: Page, height: number) {
   await page.evaluate((height) => {
     Object.defineProperty(visualViewport!, 'height', { configurable: true, value: height });

@@ -1,3 +1,4 @@
+import { normalizedWeight, weightValue } from './weight';
 import {
   assertRecordPreferences,
   mergeRecordPreferences,
@@ -394,12 +395,12 @@ export function completeSet(workout: Workout, i: number, j: number, now = Date.n
     !s.done &&
     (!Number.isInteger(Number(s.reps)) ||
       Number(s.reps) <= 0 ||
-      !Number.isFinite(Number(s.weight)) ||
-      Number(s.weight) < 0)
+      weightValue(String(s.weight).trim() === '' ? '0' : s.weight) === null)
   )
     throw Error('Enter valid weight and positive whole-number reps first.');
   s.done = !s.done;
   if (s.done) {
+    s.weight = normalizedWeight(s.weight) ?? s.weight;
     next.restSeconds = next.exercises[i].rest;
     next.restEnd = next.restSeconds === null ? null : now + next.restSeconds * 1000;
   }

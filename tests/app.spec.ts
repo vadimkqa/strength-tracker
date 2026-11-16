@@ -91,14 +91,14 @@ test('legacy history migrates, workout persists, timer and logging, history and 
   await page.getByLabel('Set options for Bench Press', { exact: true }).click();
   await page.getByRole('button', { name: 'Complete Bench Press set 1', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('positive whole-number reps');
-  await page.getByRole('spinbutton', { name: 'Weight Bench Press set 1', exact: true }).fill('60');
+  await page.getByRole('textbox', { name: 'Weight Bench Press set 1', exact: true }).fill('60');
   await page.getByRole('spinbutton', { name: 'Reps Bench Press set 1', exact: true }).fill('8');
   await page.getByRole('button', { name: 'Complete Bench Press set 1', exact: true }).click();
   await expect(page.getByRole('button', { name: 'START SET', exact: true })).toBeVisible();
   await expect(page.locator('.save-status')).toHaveText('Saved on this device');
   await page.reload();
   await expect(
-    page.getByRole('spinbutton', { name: 'Weight Bench Press set 1', exact: true }),
+    page.getByRole('textbox', { name: 'Weight Bench Press set 1', exact: true }),
   ).toHaveValue('60');
   await expect(
     page.getByRole('button', { name: 'Undo Bench Press set 1', exact: true }),
@@ -108,11 +108,11 @@ test('legacy history migrates, workout persists, timer and logging, history and 
   await page.getByRole('tab', { name: 'EXERCISES', exact: true }).click();
   await page.getByRole('button', { name: 'Add set to Bench Press', exact: true }).click();
   await expect(
-    page.getByRole('spinbutton', { name: 'Weight Bench Press set 5', exact: true }),
+    page.getByRole('textbox', { name: 'Weight Bench Press set 5', exact: true }),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Remove set from Bench Press', exact: true }).click();
   await expect(
-    page.getByRole('spinbutton', { name: 'Weight Bench Press set 5', exact: true }),
+    page.getByRole('textbox', { name: 'Weight Bench Press set 5', exact: true }),
   ).toHaveCount(0);
   await page.getByRole('button', { name: 'Finish & save workout', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Workout Complete', exact: true })).toBeVisible();
