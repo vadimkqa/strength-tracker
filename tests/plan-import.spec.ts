@@ -98,20 +98,20 @@ test('TXT preview is non-destructive; confirmed import preserves history, PRs an
   await page.getByRole('button', { name: 'PRs', exact: true }).click();
   await expect(page.locator('.record')).toContainText('100');
   await page.getByRole('button', { name: 'Train', exact: true }).click();
-  await expect(
-    page.getByRole('spinbutton', { name: 'Weight Squat set 1', exact: true }),
-  ).toHaveValue('60');
+  await expect(page.getByRole('textbox', { name: 'Weight Squat set 1', exact: true })).toHaveValue(
+    '60',
+  );
   await page.reload();
-  await expect(
-    page.getByRole('spinbutton', { name: 'Weight Squat set 1', exact: true }),
-  ).toHaveValue('60');
+  await expect(page.getByRole('textbox', { name: 'Weight Squat set 1', exact: true })).toHaveValue(
+    '60',
+  );
   page.on('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Discard workout', exact: true }).click();
   await page.getByRole('button', { name: 'EASY', exact: true }).click();
   await page.getByRole('button', { name: 'START WORKOUT' }).click();
   await expect(page.getByRole('heading', { name: 'Light Bench', exact: true })).toBeVisible();
   await expect(page.getByText('Target: 12 reps', { exact: true })).toBeVisible();
-  await expect(page.getByRole('spinbutton', { name: /Weight Light Bench set/ })).toHaveCount(2);
+  await expect(page.getByRole('textbox', { name: /Weight Light Bench set/ })).toHaveCount(2);
 });
 test('ambiguous TXT must be edited and assigned before applying; cancellation keeps templates', async ({
   page,

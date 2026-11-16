@@ -1,3 +1,4 @@
+import { normalizedWeight, weightValue } from './weight';
 import type { Exercise, SetEntry, Workout } from './data';
 export interface PreviousSet {
   weight: string;
@@ -50,13 +51,12 @@ export function previousPerformance(
       n === null ||
       chosen.ex.sets.filter((x, j) => setNumber(x, j) === n).length !== 1 ||
       !s.done ||
-      !Number.isFinite(Number(s.weight)) ||
-      Number(s.weight) < 0 ||
+      weightValue(s.weight) === null ||
       !Number.isInteger(Number(s.reps)) ||
       Number(s.reps) <= 0
     )
       return;
-    sets[n] = { weight: String(s.weight || 0), reps: String(s.reps) };
+    sets[n] = { weight: normalizedWeight(s.weight)!, reps: String(s.reps) };
   });
   return { workoutId: chosen.w.id, finished: chosen.w.finished!, sets };
 }

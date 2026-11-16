@@ -1,3 +1,4 @@
+import { weightValue, weightVolume, sumVolumes } from './weight';
 import type { Exercise, SetEntry, Workout } from './data';
 import { validLog } from './controller';
 import { exerciseComplete } from './exercise-cards';
@@ -10,7 +11,7 @@ export function workoutStatistics(workout: Workout) {
   return {
     sets: sets.length,
     exercises: workout.exercises.filter((e) => exerciseComplete(workout, e)).length,
-    volume: sets.reduce((sum, s) => sum + Number(s.weight) * Number(s.reps), 0),
+    volume: sumVolumes(sets.map((s) => weightVolume(s.weight, Number(s.reps)))),
     duration:
       Number.isFinite(workout.finished) && Number.isFinite(workout.started)
         ? Math.max(0, workout.finished! - workout.started)
@@ -32,7 +33,7 @@ export function personalRecords(history: Workout[]) {
     for (const e of w.exercises)
       for (const s of e.sets) {
         if (!loggedSet(e, s)) continue;
-        const result = { weight: Number(s.weight), reps: Number(s.reps) },
+        const result = { weight: weightValue(s.weight)!, reps: Number(s.reps) },
           previous = records.get(e.name);
         if (!previous || beatsRecord(result, previous)) records.set(e.name, result);
       }

@@ -10,6 +10,7 @@ export default defineConfig({
           '**/set-input-navigation.spec.ts',
           '**/carousel-completion.spec.ts',
           '**/records.spec.ts',
+          '**/decimal-weights.spec.ts',
         ]
       : undefined,
   use: { ...base.use, browserName, launchOptions: {} },

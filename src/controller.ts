@@ -1,3 +1,4 @@
+import { weightValue } from './weight';
 import type { Workout, SetEntry } from './data';
 export interface Position {
   exerciseId: string;
@@ -61,13 +62,7 @@ export function reconcile(w: Workout) {
     c.selected = positions(w)[0] || null;
 }
 export function validLog(s: SetEntry) {
-  return (
-    String(s.weight).trim() !== '' &&
-    Number.isFinite(Number(s.weight)) &&
-    Number(s.weight) >= 0 &&
-    Number.isInteger(Number(s.reps)) &&
-    Number(s.reps) > 0
-  );
+  return weightValue(s.weight) !== null && Number.isInteger(Number(s.reps)) && Number(s.reps) > 0;
 }
 export function finalizeLogging(w: Workout) {
   for (const e of w.exercises)

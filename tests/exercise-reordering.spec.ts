@@ -37,9 +37,7 @@ test('iPhone long press reorders, preserves entered data, expansion and plans af
   page,
 }) => {
   await beginCards(page);
-  await page
-    .getByRole('spinbutton', { name: 'Weight Bench Press set 1', exact: true })
-    .fill('72.5');
+  await page.getByRole('textbox', { name: 'Weight Bench Press set 1', exact: true }).fill('72.5');
   await page.getByRole('spinbutton', { name: 'Reps Bench Press set 1', exact: true }).fill('9');
   await page.getByRole('button', { name: 'Collapse Bench Press', exact: true }).click();
   const before = await stored(page);
@@ -60,10 +58,10 @@ test('iPhone long press reorders, preserves entered data, expansion and plans af
   await expect.poll(() => names(page)).toEqual(['Face Pull', 'Bench Press', 'Chest Dip']);
   await page.getByRole('button', { name: 'Expand Bench Press', exact: true }).click();
   await expect(
-    page.getByRole('spinbutton', { name: 'Weight Bench Press set 1', exact: true }),
+    page.getByRole('textbox', { name: 'Weight Bench Press set 1', exact: true }),
   ).toHaveValue('72.5');
   await expect(
-    page.getByRole('spinbutton', { name: 'Weight Bench Press set 1', exact: true }),
+    page.getByRole('textbox', { name: 'Weight Bench Press set 1', exact: true }),
   ).toBeVisible();
   await stored(page);
   await page.waitForTimeout(200); // Allow the card's subtle grid expansion to settle for the preview.
@@ -120,7 +118,7 @@ test('short taps, numeric input, scrolling and cancelled hold do not reorder; ke
   const original = await names(page);
   await page.getByRole('button', { name: 'Chest Dip details', exact: true }).tap();
   await expect(page.getByRole('button', { name: 'Collapse Chest Dip', exact: true })).toBeVisible();
-  await page.getByRole('spinbutton', { name: 'Weight Chest Dip set 1', exact: true }).fill('25');
+  await page.getByRole('textbox', { name: 'Weight Chest Dip set 1', exact: true }).fill('25');
   await expect(page.locator('.exercise-dragging')).toHaveCount(0);
   await page.getByRole('button', { name: 'Done editing Chest Dip', exact: true }).click();
   await expect(page.locator('html')).not.toHaveAttribute('data-workout-keyboard', 'true');

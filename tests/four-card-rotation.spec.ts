@@ -93,7 +93,7 @@ test('manual intensity override preserves selected week and exact imported templ
     page.getByRole('heading', { name: 'Week 1 · Tuesday · Bench Day · Hard', exact: true }),
   ).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Bench press', exact: true })).toBeVisible();
-  await expect(page.getByRole('spinbutton', { name: /Weight Bench press set/ })).toHaveCount(4);
+  await expect(page.getByRole('textbox', { name: /Weight Bench press set/ })).toHaveCount(4);
 });
 test('side-card taps change the week exactly once at either boundary', async ({ page }) => {
   await page.getByRole('button', { name: 'Select Hammer Press Day', exact: true }).click();

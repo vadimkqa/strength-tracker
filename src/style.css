@@ -3129,21 +3129,21 @@ html[data-workout-keyboard='true'] .live-set-controls button {
 .set-input-navigation {
   position: absolute;
   z-index: 120;
-  width: 104px;
-  height: 44px;
-  transform: translate(
-    calc(-1 * env(safe-area-inset-right)),
-    calc(-1 * env(safe-area-inset-bottom))
-  );
+  background: var(--background);
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+  transform: translate(0, calc(-1 * env(safe-area-inset-bottom)));
 }
 .set-input-navigation button {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 12px;
+  gap: 4px;
+  min-width: 0;
   width: 100%;
   height: 44px;
-  padding: 8px 12px;
+  padding: 6px 4px;
   border-color: var(--purple);
   background: #1b1c21;
   box-shadow: none;
@@ -3528,4 +3528,36 @@ html[data-workout-keyboard='true'] .live-set-controls button {
 }
 .pr-session-control select {
   margin-top: 5px;
+}
+
+.weight-adjustments {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+.set-navigation-buttons {
+  display: flex;
+  gap: 4px;
+}
+.set-navigation-buttons button {
+  flex: 1;
+}
+.set-input-navigation .weight-adjustments button {
+  font-size: 14px;
+}
+.weight-adjustments small {
+  font-size: 10px;
+  font-weight: 400;
+}
+.exercise-card input[data-set-field='weight'] {
+  text-align: center;
+}
+.exercise-card .set-input[aria-invalid='true'] {
+  border-color: #d6a6bf;
+}
+
+.weight-entry-error {
+  color: #d6a6bf;
+  font-size: 10px;
+  line-height: 1.5;
 }
