@@ -10,11 +10,11 @@ The app now renders one compact 52px-high row in a direct child portal of `docum
 
 The old absolute coordinates combined `scrollY`, `scrollX`, `visualViewport.offsetTop`, `offsetLeft` and height, with React position updates on scroll. That was vulnerable to asynchronous native focus scrolling and toolbar movement. The new layer is **fixed**, outside card transforms and drag contexts. Its only vertical model is:
 
-`top = min(visualViewport.offsetTop + visualViewport.height, layoutViewport.height − bottomSafeArea) − measured accessory height`
+`top = visualViewport.offsetTop + min(visualViewport.height, layoutViewport.height − bottomSafeArea) − measured accessory height`
 
 Document scrolling is never added to this value. Horizontal geometry comes only from CSS left/right safe-area insets; neither `scrollX` nor visual viewport horizontal panning changes its x position. Resize/visual-scroll events are batched into one animation frame reading the latest bounds. A numeric placement cache with 0.01px tolerance avoids a demonstrated CSSOM-serialization feedback loop on fractional viewport coordinates (repeated reveal events stopped after this correction). The bar is hidden until positioned. The focus-reveal hook ignores its provisional hidden `top: 0` rectangle, preventing an initial unnecessary input/page scroll before the first measured placement. Body/main sizing, navigation offsets, controller anchoring and the single document scroller are unchanged.
 
-Visible bounds are intersected with the layout safe edge: when the keyboard reduces the visible area below that edge, safe area is not subtracted a second time. There is no keyboard-open threshold or estimated keyboard height, so crossing a threshold cannot introduce a separate safe-area jump. The existing focused-input reveal hook consumes the accessory's measured top after it moves. This is not a second keyboard-height calculation and does not translate fixed app chrome.
+Visible height is limited by layout safe height before adding the visual offset. A keyboard-reduced viewport does not subtract the home-indicator inset a second time, including when panned to the layout bottom. There is no keyboard-open threshold or estimated keyboard height, so crossing a threshold cannot introduce a separate safe-area jump. The existing focused-input reveal hook consumes the accessory's measured top after it moves. This is not a second keyboard-height calculation and does not translate fixed app chrome.
 
 ## Touch and focus
 

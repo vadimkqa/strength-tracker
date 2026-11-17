@@ -31,3 +31,8 @@ it('intersects safe bounds continuously during keyboard animation without a keyb
   expect(positions).toEqual([788, 788, 788, 782, 488]);
   expect(accessoryTop({ offsetTop: 60, height: 480 }, 52, 34, 874)).toBe(488);
 });
+
+it('does not reserve the home-indicator inset again when the keyboard viewport pans to the layout bottom', () => {
+  expect(accessoryTop({ offsetTop: 374, height: 500 }, 52, 34, 874)).toBe(822);
+  expect(accessoryTop({ offsetTop: 374, height: 500 }, 52, 34, 874) + 52).toBe(874);
+});
