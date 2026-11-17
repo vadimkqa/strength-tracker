@@ -77,12 +77,14 @@ export function SetInputNavigation() {
       const bar = accessory.current;
       if (!bar || !live.current) return;
       const viewport = vv || { offsetTop: 0, height: innerHeight };
-      // The keyboard already excludes the home-indicator region. Reserve it only without a reduced viewport.
       const safe =
-        viewport.height < document.documentElement.clientHeight - 80
-          ? 0
-          : parseFloat(getComputedStyle(bar).getPropertyValue('--accessory-safe-bottom')) || 0;
-      const top = accessoryTop(viewport, bar.getBoundingClientRect().height, safe);
+        parseFloat(getComputedStyle(bar).getPropertyValue('--accessory-safe-bottom')) || 0;
+      const top = accessoryTop(
+        viewport,
+        bar.getBoundingClientRect().height,
+        safe,
+        document.documentElement.clientHeight,
+      );
       const changed = bar.style.top !== `${top}px`;
       bar.style.top = `${top}px`;
       bar.dataset.positioned = 'true';

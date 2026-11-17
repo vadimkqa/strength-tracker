@@ -23,3 +23,11 @@ it('clamps negative/oversized bounds without using document or horizontal scroll
   expect(accessoryTop({ offsetTop: 0, height: 20 }, 52)).toBe(0);
   expect(accessoryTop({ offsetTop: 0, height: 400 }, 52, -20)).toBe(348);
 });
+
+it('intersects safe bounds continuously during keyboard animation without a keyboard threshold', () => {
+  const positions = [874, 864, 844, 834, 540].map((height) =>
+    accessoryTop({ offsetTop: 0, height }, 52, 34, 874),
+  );
+  expect(positions).toEqual([788, 788, 788, 782, 488]);
+  expect(accessoryTop({ offsetTop: 60, height: 480 }, 52, 34, 874)).toBe(488);
+});

@@ -10,11 +10,11 @@ The app now renders one compact 52px-high row in a direct child portal of `docum
 
 The old absolute coordinates combined `scrollY`, `scrollX`, `visualViewport.offsetTop`, `offsetLeft` and height, with React position updates on scroll. That was vulnerable to asynchronous native focus scrolling and toolbar movement. The new layer is **fixed**, outside card transforms and drag contexts. Its only vertical model is:
 
-`top = visualViewport.offsetTop + visualViewport.height − measured accessory height − applicable bottom safe area`
+`top = min(visualViewport.offsetTop + visualViewport.height, layoutViewport.height − bottomSafeArea) − measured accessory height`
 
 Document scrolling is never added to this value. Horizontal geometry comes only from CSS left/right safe-area insets; neither `scrollX` nor visual viewport horizontal panning changes its x position. Resize/visual-scroll events are batched into one animation frame reading the latest bounds. The bar is hidden until positioned. Body/main sizing, navigation offsets, controller anchoring and the single document scroller are unchanged.
 
-A reduced visual viewport already excludes the keyboard/home-indicator region, so bottom safe area is not subtracted again there. The normal, unreduced viewport retains the bottom safe inset. The existing focused-input reveal hook consumes the accessory's measured top after it moves. This is not a second keyboard-height calculation and does not translate fixed app chrome.
+Visible bounds are intersected with the layout safe edge: when the keyboard reduces the visible area below that edge, safe area is not subtracted a second time. There is no keyboard-open threshold or estimated keyboard height, so crossing a threshold cannot introduce a separate safe-area jump. The existing focused-input reveal hook consumes the accessory's measured top after it moves. This is not a second keyboard-height calculation and does not translate fixed app chrome.
 
 ## Touch and focus
 
