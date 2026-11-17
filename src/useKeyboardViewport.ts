@@ -57,7 +57,12 @@ export function useKeyboardViewport() {
           const delta = focusedInputDelta(
             focused.getBoundingClientRect(),
             vv || { offsetTop: 0, height: innerHeight },
-            document.querySelector('.set-input-navigation')?.getBoundingClientRect().top,
+            // A newly mounted fixed accessory is hidden at top:0 until its first viewport placement.
+            // Never scroll the input against that provisional, non-visible rectangle.
+            document.querySelector<HTMLElement>('.set-input-navigation')?.dataset.positioned ===
+              'true'
+              ? document.querySelector('.set-input-navigation')!.getBoundingClientRect().top
+              : undefined,
           );
           if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
         }

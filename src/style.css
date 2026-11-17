@@ -3124,31 +3124,50 @@ html[data-workout-keyboard='true'] .live-set-controls button {
   scroll-margin-block: 8px;
 }
 
-/* A small input accessory follows the visible viewport in document coordinates.
-   It never changes navigation offsets, content sizing or the root scroll container. */
+/* One body-level fixed row: visualViewport supplies top; no document scroll offsets. */
 .set-input-navigation {
-  position: absolute;
+  --accessory-safe-bottom: env(safe-area-inset-bottom, 0px);
+  position: fixed;
+  top: 0;
+  left: max(2px, env(safe-area-inset-left));
+  right: max(2px, env(safe-area-inset-right));
   z-index: 120;
-  background: var(--background);
-  border-radius: 12px;
+  visibility: hidden;
   display: grid;
-  gap: 4px;
-  transform: translate(0, calc(-1 * env(safe-area-inset-bottom)));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  padding: 4px 0;
+  height: 52px;
+  border-radius: 10px;
+  background: var(--background);
+  isolation: isolate;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.set-input-navigation[data-positioned='true'] {
+  visibility: visible;
+}
+.set-input-navigation[data-weight-controls='true'] {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 .set-input-navigation button {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 4px;
   min-width: 0;
-  width: 100%;
+  min-height: 44px;
   height: 44px;
-  padding: 6px 4px;
+  padding: 4px 1px;
   border-color: var(--purple);
-  background: #1b1c21;
-  box-shadow: none;
-  font-size: 16px;
-  touch-action: manipulation;
+  background: var(--card);
+  font-size: 12px;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+.set-input-navigation .set-navigation-buttons button {
+  font-size: 22px;
+}
+.weight-adjustments,
+.set-navigation-buttons {
+  display: contents;
 }
 
 /* Muted completion accents preserve the original photographs and playing-card layout. */
@@ -3530,25 +3549,6 @@ html[data-workout-keyboard='true'] .live-set-controls button {
   margin-top: 5px;
 }
 
-.weight-adjustments {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
-}
-.set-navigation-buttons {
-  display: flex;
-  gap: 4px;
-}
-.set-navigation-buttons button {
-  flex: 1;
-}
-.set-input-navigation .weight-adjustments button {
-  font-size: 14px;
-}
-.weight-adjustments small {
-  font-size: 10px;
-  font-weight: 400;
-}
 .exercise-card input[data-set-field='weight'] {
   text-align: center;
 }
@@ -3560,4 +3560,8 @@ html[data-workout-keyboard='true'] .live-set-controls button {
   color: #d6a6bf;
   font-size: 10px;
   line-height: 1.5;
+}
+
+.set-input-navigation button:focus-visible {
+  outline-offset: -3px;
 }

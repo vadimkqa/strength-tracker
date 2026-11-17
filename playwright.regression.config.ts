@@ -11,6 +11,7 @@ export default defineConfig({
           '**/carousel-completion.spec.ts',
           '**/records.spec.ts',
           '**/decimal-weights.spec.ts',
+          '**/iphone-accessory.spec.ts',
         ]
       : undefined,
   use: { ...base.use, browserName, launchOptions: {} },

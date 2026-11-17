@@ -14,7 +14,7 @@ The shared weight parser feeds live-set validation, previous performance, workou
 
 There is no schema migration, history rewrite, active-session reset, backup-format change or new dependency. Existing integer snapshots remain unchanged. Canonicalization applies to fields the user edits or explicitly completes, not stored history. Existing backup/restore paths carry original strings/numbers and draft active values without rewriting them. The legacy `completeSet` helper keeps its pre-existing empty-load behavior; the live controller continues to require an explicit load.
 
-The accessory remains in the document layer, positioned using the visible viewport. Navigation/controller offsets are not moved by keyboard height, and the document remains the only scroller. The existing constant bottom footprint is retained; it does not change on focus, keyboard resize or dismissal. After a viewport change repositions the accessory, the existing hook remeasures it and reveals the focused field above its bounds. Existing focus-reveal logic accounts for the accessory's measured bounds.
+The original accessory positioning and touch handling described by this decimal-entry change have been superseded by the [iPhone keyboard accessory correction](iphone-keyboard-accessory.md). The current accessory is one fixed body-level row positioned from visual viewport bounds, with protected native touch handling. See that document for current previews and required physical-device acceptance; the original decimal-entry screenshots below show the earlier implementation.
 
 ## iPhone-sized screenshots
 
