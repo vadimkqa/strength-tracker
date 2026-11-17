@@ -40,6 +40,7 @@ export function SetInputNavigation() {
   const lastTouch = useRef(-Infinity);
   const act = useRef<(action: string, input: HTMLInputElement) => void>(() => {});
   const position = useRef<() => void>(() => {});
+  const placement = useRef<{ bar: HTMLDivElement; top: number } | null>(null);
   const usable = (input: HTMLInputElement) =>
     input.isConnected &&
     !input.disabled &&
@@ -85,8 +86,13 @@ export function SetInputNavigation() {
         safe,
         document.documentElement.clientHeight,
       );
-      const changed = bar.style.top !== `${top}px`;
-      bar.style.top = `${top}px`;
+      // CSSOM rounds fractional pixels when serializing style.top; compare numbers, not that string.
+      const changed =
+        placement.current?.bar !== bar || Math.abs(placement.current.top - top) > 0.01;
+      if (changed) {
+        bar.style.top = `${top}px`;
+        placement.current = { bar, top };
+      }
       bar.dataset.positioned = 'true';
       if (changed) window.dispatchEvent(new Event('workout-input-navigation'));
     };

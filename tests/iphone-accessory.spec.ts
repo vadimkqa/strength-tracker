@@ -238,3 +238,36 @@ test('402x874 iPhone 17 Pro-sized standalone preview has one compact app accesso
     animations: 'disabled',
   });
 });
+
+test('fractional Safari viewport coordinates settle without a CSS serialization/reveal feedback loop', async ({
+  page,
+}) => {
+  await beginCards(page);
+  await field(page).focus();
+  await expect(page.locator('.set-input-navigation')).toBeVisible();
+  const extra = await page.evaluate(async () => {
+    let count = 0;
+    const listener = () => count++;
+    window.addEventListener('workout-input-navigation', listener);
+    Object.defineProperty(visualViewport!, 'height', {
+      configurable: true,
+      value: 480.3333333333333,
+    });
+    Object.defineProperty(visualViewport!, 'offsetTop', {
+      configurable: true,
+      value: 60.3333333333333,
+    });
+    visualViewport!.dispatchEvent(new Event('resize'));
+    const frames = async (n: number) => {
+      for (let i = 0; i < n; i++)
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    };
+    await frames(12);
+    const baseline = count;
+    await frames(6);
+    window.removeEventListener('workout-input-navigation', listener);
+    return count - baseline;
+  });
+  expect(extra).toBe(0);
+  await expect(field(page)).toBeFocused();
+});
