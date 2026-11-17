@@ -6,7 +6,7 @@ Reported device: **iPhone 17 Pro, iOS 27.3, Safari Add to Home Screen standalone
 
 ## What changed
 
-The app now renders one compact 52px-high row in a direct child portal of `document.body`. The four weight adjustments and Previous/Next/Done occupy the same row; there is one app Done control. Reps show navigation only. Arrow/check icons have full accessible names; controls are at least 40px wide and 44px high at a 320px viewport. Precision remains the existing integer-gram arithmetic (0.001 kg), and accessory actions do not invoke set/timer/workout commands.
+The app now renders one compact 52px-high row in a direct child portal of `document.body`. The four weight adjustments and Previous/Next/Done occupy the same row; there is one app Done control. Reps show navigation only. Arrow/check icons have full accessible names; controls are at least 44px wide and 44px high at a 320px viewport. Precision remains the existing integer-gram arithmetic (0.001 kg), and accessory actions do not invoke set/timer/workout commands.
 
 The old absolute coordinates combined `scrollY`, `scrollX`, `visualViewport.offsetTop`, `offsetLeft` and height, with React position updates on scroll. That was vulnerable to asynchronous native focus scrolling and toolbar movement. The new layer is **fixed**, outside card transforms and drag contexts. Its only vertical model is:
 
@@ -18,7 +18,7 @@ Visible bounds are intersected with the layout safe edge: when the keyboard redu
 
 ## Touch and focus
 
-Previously actions depended on a later click and React pointer prevention alone. Native listeners now cancel the touch default on **non-passive touchstart** before normal focus transfer, and activate on touchend within the same trusted gesture. Touch movement/cancellation does not adjust the weight. Compatibility clicks after touch are suppressed so an increment cannot apply twice. Mouse and keyboard clicks retain semantic-button behavior.
+Previously actions depended on a later click and React pointer prevention alone. Pointer-down prevention is retained for every pointer type. Native listeners additionally cancel the touch default on **non-passive touchstart** before normal focus transfer, and activate on touchend within the same trusted gesture. Touch movement/cancellation does not adjust the weight. Compatibility clicks after touch are suppressed so an increment cannot apply twice. Mouse and keyboard clicks retain semantic-button behavior.
 
 The currently focused input is retained across a protected accessory touch. If focus is lost during that gesture, adjustment restores it synchronously inside touchend before using the ordinary controlled-input handler; no timeout or asynchronous refocus is the sole recovery mechanism. Previous/Next also focus their target synchronously. Done blurs and removes the app accessory. Cancelled interactions clean up retained touch state rather than leaving an invisible input-blocking layer.
 

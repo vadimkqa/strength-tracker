@@ -3129,14 +3129,14 @@ html[data-workout-keyboard='true'] .live-set-controls button {
   --accessory-safe-bottom: env(safe-area-inset-bottom, 0px);
   position: fixed;
   top: 0;
-  left: max(4px, env(safe-area-inset-left));
-  right: max(4px, env(safe-area-inset-right));
+  left: max(2px, env(safe-area-inset-left));
+  right: max(2px, env(safe-area-inset-right));
   z-index: 120;
   visibility: hidden;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 2px;
-  padding: 4px;
+  gap: 1px;
+  padding: 4px 0;
   height: 52px;
   border-radius: 10px;
   background: var(--background);
@@ -3149,7 +3149,7 @@ html[data-workout-keyboard='true'] .live-set-controls button {
   visibility: visible;
 }
 .set-input-navigation[data-weight-controls='true'] {
-  grid-template-columns: repeat(4, minmax(0, 1fr)) repeat(3, 40px);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 .set-input-navigation button {
   min-width: 0;
@@ -3560,4 +3560,8 @@ html[data-workout-keyboard='true'] .live-set-controls button {
   color: #d6a6bf;
   font-size: 10px;
   line-height: 1.5;
+}
+
+.set-input-navigation button:focus-visible {
+  outline-offset: -3px;
 }

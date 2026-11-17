@@ -224,7 +224,7 @@ export function SetInputNavigation() {
       aria-label={label}
       disabled={disabled}
       onPointerDown={(event) => {
-        if (event.pointerType !== 'touch') event.preventDefault();
+        event.preventDefault();
       }}
       onMouseDown={(event) => event.preventDefault()}
       onClick={(event) => {

@@ -52,6 +52,11 @@ for (const [width, height] of [
     expect(await bar.evaluate((el) => el.parentElement === document.body)).toBe(true);
     const original = (await bar.boundingBox())!;
     expect(original.height).toBe(52);
+    for (const button of await bar.getByRole('button').all()) {
+      const bounds = (await button.boundingBox())!;
+      expect(bounds.width).toBeGreaterThanOrEqual(44);
+      expect(bounds.height).toBeGreaterThanOrEqual(44);
+    }
     await page.evaluate(() => {
       window.scrollBy(0, 24);
       window.dispatchEvent(new Event('scroll'));
