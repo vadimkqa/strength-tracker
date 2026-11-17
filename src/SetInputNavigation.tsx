@@ -1,286 +1,171 @@
-import { accessoryTop } from './accessory-geometry';
-import { adjustWeight } from './weight';
 import { useLayoutEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { flushSync } from 'react-dom';
+import type { Workout } from './data';
+import { adjustWorkoutInput } from './workout-inputs';
 
-/** Resolve the live DOM order inside one exercise; no indices or saved session state. */
-function adjacentInput(input: HTMLInputElement, direction: -1 | 1) {
-  const card = input.closest('.exercise-card');
-  if (!card || card.closest('[inert]')) return null;
-  const fields = [...card.querySelectorAll<HTMLInputElement>('.set-input')].filter(
-    (field) => !field.disabled && field.getClientRects().length > 0,
-  );
-  const index = fields.indexOf(input);
-  return index < 0 ? null : fields[index + direction] || null;
-}
-export function advanceSetInput(input: HTMLInputElement) {
-  if (!input.isConnected) return;
-  const next = adjacentInput(input, 1);
-  // Keep focus in the trusted input/click gesture. No blur, timeout or model update between fields.
-  if (next) next.focus({ preventScroll: true });
-  else input.blur();
-}
-interface Navigation {
-  input: HTMLInputElement;
-  next: string | null;
-  previous: string | null;
-  weight: boolean;
-}
-/** One fixed body-level layer; visualViewport is the only positioning authority. */
-export function SetInputNavigation() {
-  const [navigation, setNavigation] = useState<Navigation | null>(null);
-  const accessory = useRef<HTMLDivElement>(null);
-  const live = useRef<Navigation | null>(null);
-  const touch = useRef<{
-    button: HTMLButtonElement;
-    input: HTMLInputElement;
-    x: number;
-    y: number;
-  } | null>(null);
-  const lastTouch = useRef(-Infinity);
-  const act = useRef<(action: string, input: HTMLInputElement) => void>(() => {});
-  const position = useRef<() => void>(() => {});
-  const placement = useRef<{ bar: HTMLDivElement; top: number } | null>(null);
-  const usable = (input: HTMLInputElement) =>
+function usable(input: HTMLInputElement) {
+  return (
     input.isConnected &&
     !input.disabled &&
     !input.closest('[inert]') &&
     input.matches('.active-workout .set-input') &&
-    input.getClientRects().length > 0;
-  act.current = (action, input) => {
-    if (!usable(input)) return;
-    if (action === 'done') {
-      touch.current = null;
-      input.blur();
-      if (accessory.current?.contains(document.activeElement))
-        (document.activeElement as HTMLElement).blur();
-      live.current = null;
-      setNavigation(null);
-      return;
-    }
-    // All restoration is synchronous inside the trusted gesture, never a delayed keyboard reopen.
-    if (action === 'previous' || action === 'next') {
-      adjacentInput(input, action === 'previous' ? -1 : 1)?.focus({ preventScroll: true });
+    getComputedStyle(input).visibility !== 'hidden'
+  );
+}
+function adjacentInput(input: HTMLInputElement, direction: -1 | 1) {
+  const fields = [
+    ...(input.closest('.exercise-card')?.querySelectorAll<HTMLInputElement>('.set-input') || []),
+  ].filter(usable);
+  const index = fields.indexOf(input);
+  return index < 0 ? null : fields[index + direction] || null;
+}
+export function advanceSetInput(input: HTMLInputElement) {
+  if (!usable(input)) return;
+  // Let the browser scroll the new field into its real visible keyboard area.
+  const next = adjacentInput(input, 1);
+  if (next) next.focus();
+  else input.blur();
+}
+interface Props {
+  workout: Workout;
+  change: (fn: (workout: Workout) => Workout) => void;
+}
+/** Permanent, ordinary document-flow editing controls. Not an OS keyboard accessory. */
+export function SetInputNavigation({ workout, change }: Props) {
+  const [target, setTarget] = useState<HTMLInputElement | null>(null);
+  const current = useRef<HTMLInputElement | null>(null),
+    root = useRef<HTMLDivElement>(null);
+  const action = useRef<(name: string) => void>(() => {});
+  const input = target && usable(target) ? target : null;
+  const exerciseId = input?.closest<HTMLElement>('[data-exercise-id]')?.dataset.exerciseId;
+  const setId = input?.closest<HTMLElement>('[data-set-id]')?.dataset.setId;
+  const exercise = workout.exercises.find((e) => e.id === exerciseId);
+  const index = exercise?.sets.findIndex((s) => s.id === setId) ?? -1;
+  const entry = exercise?.sets[index];
+  const weight = input?.dataset.setField === 'weight';
+  const next = input ? adjacentInput(input, 1) : null,
+    previous = input ? adjacentInput(input, -1) : null;
+  action.current = (name) => {
+    const input = current.current;
+    if (!input || !usable(input)) return;
+    if (name === 'previous' || name === 'next') {
+      if (name === 'next') advanceSetInput(input);
+      else adjacentInput(input, -1)?.focus();
       return;
     }
     if (input.dataset.setField !== 'weight') return;
-    input.focus({ preventScroll: true });
-    const value = adjustWeight(input.value, Number(action) as -500 | -250 | 250 | 500);
-    if (value === null) return;
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const exerciseId = input.closest<HTMLElement>('[data-exercise-id]')?.dataset.exerciseId;
+    const setId = input.closest<HTMLElement>('[data-set-id]')?.dataset.setId;
+    // Do not refocus an already focused input (or dispatch an artificial input event).
+    // Recover an earlier blur synchronously in this first trusted press if necessary.
+    if (document.activeElement !== input) input.focus();
+    change((w) =>
+      adjustWorkoutInput(w, exerciseId, setId, Number(name) as -500 | -250 | 250 | 500),
+    );
   };
   useLayoutEffect(() => {
-    const vv = window.visualViewport;
-    let frame = 0;
-    const place = () => {
-      frame = 0;
-      const bar = accessory.current;
-      if (!bar || !live.current) return;
-      const viewport = vv || { offsetTop: 0, height: innerHeight };
-      const safe =
-        parseFloat(getComputedStyle(bar).getPropertyValue('--accessory-safe-bottom')) || 0;
-      const top = accessoryTop(
-        viewport,
-        bar.getBoundingClientRect().height,
-        safe,
-        document.documentElement.clientHeight,
-      );
-      // CSSOM rounds fractional pixels when serializing style.top; compare numbers, not that string.
-      const changed =
-        placement.current?.bar !== bar || Math.abs(placement.current.top - top) > 0.01;
-      if (changed) {
-        bar.style.top = `${top}px`;
-        placement.current = { bar, top };
+    const focus = (event: FocusEvent) => {
+      const input = event.target;
+      if (input instanceof HTMLInputElement && usable(input)) {
+        current.current = input;
+        setTarget(input);
       }
-      bar.dataset.positioned = 'true';
-      if (changed) window.dispatchEvent(new Event('workout-input-navigation'));
+      // Deliberately no focusout teardown: a press cannot destroy its own controls/target.
     };
-    const schedule = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(place);
+    document.addEventListener('focusin', focus);
+    if (document.activeElement instanceof HTMLInputElement && usable(document.activeElement)) {
+      current.current = document.activeElement;
+      setTarget(document.activeElement);
+    }
+    const strip = root.current!;
+    const start = (event: TouchEvent) => {
+      const button =
+        event.target instanceof Element
+          ? event.target.closest<HTMLButtonElement>('button[data-action]')
+          : null;
+      if (!button || event.touches.length !== 1) return;
+      if (event.cancelable) event.preventDefault();
+      event.stopPropagation();
+      if (!button.disabled) flushSync(() => action.current(button.dataset.action!));
     };
-    position.current = schedule;
-    const update = (event?: Event) => {
-      if (
-        event?.type === 'focusout' &&
-        (touch.current ||
-          accessory.current?.contains((event as FocusEvent).relatedTarget as Node | null))
-      )
-        return;
-      const input = document.activeElement;
-      if (accessory.current?.contains(input)) return;
-      if (
-        !(input instanceof HTMLInputElement) ||
-        !usable(input) ||
-        document.hidden ||
-        (vv && Math.abs(vv.scale - 1) >= 0.02)
-      ) {
-        // Retain the input only for an in-flight, protected accessory touch.
-        if (!document.hidden && touch.current && usable(touch.current.input)) return;
-        touch.current = null;
-        live.current = null;
-        setNavigation(null);
-        return;
-      }
-      const next = adjacentInput(input, 1)?.getAttribute('aria-label') || null;
-      const previous = adjacentInput(input, -1)?.getAttribute('aria-label') || null;
-      const nav = { input, next, previous, weight: input.dataset.setField === 'weight' };
-      live.current = nav;
-      setNavigation((old) =>
-        old?.input === input && old.next === next && old.previous === previous ? old : nav,
-      );
-      schedule();
-    };
-    const geometry = () => {
-      update();
-      schedule();
-    };
-    // Document scrolling does not reposition a fixed layer or feed another scroll calculation.
-    for (const event of ['focusin', 'focusout', 'pageshow', 'workout-viewport-change'])
-      window.addEventListener(event, update);
-    window.addEventListener('resize', geometry);
-    vv?.addEventListener('resize', geometry);
-    vv?.addEventListener('scroll', geometry);
-    document.addEventListener('visibilitychange', update);
-    update();
+    // Safari's root touch listeners may be passive; attach locally and explicitly non-passive.
+    strip.addEventListener('touchstart', start, { passive: false });
     return () => {
-      cancelAnimationFrame(frame);
-      for (const event of ['focusin', 'focusout', 'pageshow', 'workout-viewport-change'])
-        window.removeEventListener(event, update);
-      window.removeEventListener('resize', geometry);
-      vv?.removeEventListener('resize', geometry);
-      vv?.removeEventListener('scroll', geometry);
-      document.removeEventListener('visibilitychange', update);
+      document.removeEventListener('focusin', focus);
+      strip.removeEventListener('touchstart', start);
     };
   }, []);
-  useLayoutEffect(() => {
-    const bar = accessory.current;
-    if (!bar || !navigation) return;
-    position.current();
-    const buttonAt = (target: EventTarget | null) =>
-      target instanceof Element ? target.closest<HTMLButtonElement>('button[data-action]') : null;
-    const start = (event: TouchEvent) => {
-      const button = buttonAt(event.target),
-        nav = live.current;
-      if (!button || button.disabled || !nav || !usable(nav.input) || event.touches.length !== 1)
-        return;
-      if (event.cancelable) event.preventDefault();
-      event.stopPropagation();
-      const point = event.touches[0];
-      lastTouch.current = performance.now();
-      touch.current = { button, input: nav.input, x: point.clientX, y: point.clientY };
-    };
-    const move = (event: TouchEvent) => {
-      if (!touch.current) return;
-      if (event.cancelable) event.preventDefault();
-      event.stopPropagation();
-      const point = event.touches[0];
-      if (
-        !point ||
-        Math.hypot(point.clientX - touch.current.x, point.clientY - touch.current.y) > 12
-      ) {
-        touch.current = null;
-        lastTouch.current = performance.now();
-      }
-    };
-    const end = (event: TouchEvent) => {
-      const held = touch.current;
-      if (!held) {
-        window.dispatchEvent(new Event('workout-viewport-change'));
-        return;
-      }
-      if (event.cancelable) event.preventDefault();
-      event.stopPropagation();
-      touch.current = null;
-      lastTouch.current = performance.now();
-      const point = event.changedTouches[0],
-        rect = held.button.getBoundingClientRect();
-      if (
-        point &&
-        point.clientX >= rect.left &&
-        point.clientX <= rect.right &&
-        point.clientY >= rect.top &&
-        point.clientY <= rect.bottom
-      )
-        act.current(held.button.dataset.action!, held.input);
-    };
-    const cancel = () => {
-      touch.current = null;
-      lastTouch.current = performance.now();
-      window.dispatchEvent(new Event('workout-viewport-change'));
-    };
-    bar.addEventListener('touchstart', start, { passive: false });
-    bar.addEventListener('touchmove', move, { passive: false });
-    bar.addEventListener('touchend', end, { passive: false });
-    bar.addEventListener('touchcancel', cancel);
-    return () => {
-      bar.removeEventListener('touchstart', start);
-      bar.removeEventListener('touchmove', move);
-      bar.removeEventListener('touchend', end);
-      bar.removeEventListener('touchcancel', cancel);
-    };
-  }, [navigation?.input]);
-  if (!navigation) return null;
-  const control = (action: string, label: string, text: string, disabled = false) => (
+  const control = (name: string, label: string, text: string, disabled = false) => (
     <button
+      key={name}
       type="button"
-      key={action}
-      data-action={action}
+      data-action={name}
       aria-label={label}
       disabled={disabled}
       onPointerDown={(event) => {
         event.preventDefault();
+        if (event.pointerType !== 'touch' && event.button === 0) action.current(name);
       }}
-      onMouseDown={(event) => event.preventDefault()}
+      onMouseDown={(event) => {
+        event.preventDefault();
+        if (!window.PointerEvent) action.current(name);
+      }}
       onClick={(event) => {
-        // Touchend already committed the action; suppress its possible compatibility click.
-        if (event.detail > 0 && performance.now() - lastTouch.current < 800) return;
-        act.current(action, navigation.input);
+        if (event.detail === 0) action.current(name);
       }}
     >
       {text}
     </button>
   );
-  return createPortal(
+  return (
     <div
-      ref={accessory}
+      ref={root}
       className="set-input-navigation"
       role="group"
       aria-label="Set input navigation"
-      data-weight-controls={navigation.weight || undefined}
+      data-weight-controls={weight || undefined}
     >
-      {navigation.weight && (
-        <div className="weight-adjustments" role="group" aria-label="Adjust focused weight">
-          {([-500, -250, 250, 500] as const).map((delta) =>
-            control(
-              String(delta),
-              `${delta < 0 ? 'Decrease' : 'Increase'} weight by ${Math.abs(delta) / 1000} kg`,
-              `${delta < 0 ? '−' : '+'}${Math.abs(delta) / 1000}`,
-            ),
-          )}
-        </div>
-      )}
-      <div className="set-navigation-buttons">
+      <div className="set-editing-context" aria-live="polite">
+        <span>
+          {entry
+            ? `${exercise!.name} · Set ${index + 1} · ${weight ? 'Weight' : 'Reps'}`
+            : 'Select a reps or weight field'}
+        </span>
+        <output>
+          {entry ? `${entry[weight ? 'weight' : 'reps']}${weight ? ' kg' : ' reps'}` : ''}
+        </output>
+      </div>
+      <div className="set-editing-buttons">
+        {weight ? (
+          <div className="weight-adjustments" role="group" aria-label="Adjust focused weight">
+            {([-500, -250, 250, 500] as const).map((delta) =>
+              control(
+                String(delta),
+                `${delta < 0 ? 'Decrease' : 'Increase'} weight by ${Math.abs(delta) / 1000} kg`,
+                `${delta < 0 ? '−' : '+'}${Math.abs(delta) / 1000}`,
+              ),
+            )}
+          </div>
+        ) : (
+          Array.from({ length: 4 }, (_, i) => <span key={i} aria-hidden="true" />)
+        )}
         {control(
           'previous',
-          navigation.previous ? `Previous: ${navigation.previous}` : 'Previous field',
+          previous ? `Previous: ${previous.getAttribute('aria-label')}` : 'Previous field',
           '←',
-          !navigation.previous,
+          !previous,
         )}
         {control(
           'next',
-          navigation.next ? `Next: ${navigation.next}` : 'Next field',
-          '→',
-          !navigation.next,
-        )}
-        {control(
-          'done',
-          navigation.next ? 'Dismiss set keyboard' : 'Done entering this exercise',
-          '✓',
+          next
+            ? `Next: ${next.getAttribute('aria-label')}`
+            : input
+              ? 'Done entering this exercise'
+              : 'Next field',
+          next ? 'Next →' : 'Done ✓',
+          !input,
         )}
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 }

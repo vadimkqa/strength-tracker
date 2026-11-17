@@ -85,7 +85,6 @@ export function WorkoutScreens({ workout: w, now, change, finish, children }: Pr
         }
       }}
     >
-      {c.screen === 'exercises' && <SetInputNavigation />}
       <div className="workout-navigation">
         <div className="workout-screen-tabs" role="tablist" aria-label="Workout screens">
           {(['exercises', 'timer'] as const).map((s) => (
@@ -102,6 +101,7 @@ export function WorkoutScreens({ workout: w, now, change, finish, children }: Pr
           ))}
         </div>
       </div>
+      {c.screen === 'exercises' && <SetInputNavigation workout={w} change={change} />}
       {pending.length > 0 && (
         <aside className="notice" role="alert">
           Set timing saved. Enter valid weight and positive reps for {pending.length} stopped set
