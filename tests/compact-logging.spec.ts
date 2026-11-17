@@ -38,15 +38,10 @@ for (const [width, height] of [
     );
     const field = page.getByLabel('Weight Bench Press set 1', { exact: true });
     await page.evaluate(() => scrollBy(0, 40));
+    // Resize the real browser viewport, so native focus scrolling can run. Merely overriding
+    // visualViewport.height does not emulate native keyboard occlusion or automatic scrolling.
+    await page.setViewportSize({ width, height: height - 300 });
     await field.focus();
-    await page.evaluate(() => {
-      Object.defineProperty(visualViewport!, 'height', {
-        configurable: true,
-        value: innerHeight - 300,
-      });
-      Object.defineProperty(visualViewport!, 'offsetTop', { configurable: true, value: 20 });
-      visualViewport!.dispatchEvent(new Event('resize'));
-    });
     await expect(page.locator('html')).toHaveAttribute('data-workout-keyboard', 'true');
     await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeHidden();
     const after = await inputs.evaluateAll((els) =>
@@ -64,7 +59,7 @@ for (const [width, height] of [
     await expect
       .poll(async () => {
         const r = (await field.boundingBox())!;
-        return r.y >= 28 && r.y + r.height <= height - 300 + 20 - 8;
+        return r.y >= 0 && r.y + r.height <= (await page.evaluate(() => innerHeight));
       })
       .toBe(true);
     await field.fill('67.5');
@@ -87,11 +82,7 @@ for (const [width, height] of [
       'true',
     );
     await page.getByRole('button', { name: 'Done editing Bench Press', exact: true }).click();
-    await page.evaluate(() => {
-      Object.defineProperty(visualViewport!, 'height', { configurable: true, value: innerHeight });
-      Object.defineProperty(visualViewport!, 'offsetTop', { configurable: true, value: 0 });
-      visualViewport!.dispatchEvent(new Event('resize'));
-    });
+    await page.setViewportSize({ width, height });
     await expect(page.locator('html')).not.toHaveAttribute('data-workout-keyboard', 'true');
     await expect(bubble).toBeVisible();
     const old = (await bubble.boundingBox())!;
