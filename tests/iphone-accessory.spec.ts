@@ -199,6 +199,20 @@ test('running set, exercise drag guards and timer phase survive accessory touche
   await expect(field(page)).toHaveValue('8.625');
   expect((await stored(page)).active.controller.phase).toBe('set');
 });
+test('initial hidden accessory cannot scroll an already-visible input against a provisional top:0 rectangle', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 402, height: 874 });
+  await beginCards(page);
+  await page.evaluate(() => {
+    (document.activeElement as HTMLElement)?.blur();
+    scrollTo(0, 0);
+  });
+  await field(page).evaluate((input) => input.focus({ preventScroll: true }));
+  await expect(page.locator('.set-input-navigation')).toHaveAttribute('data-positioned', 'true');
+  await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
+  await expect(field(page)).toBeFocused();
+});
 test('402x874 iPhone 17 Pro-sized standalone preview has one compact app accessory', async ({
   page,
 }) => {
