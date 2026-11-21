@@ -129,7 +129,8 @@ describe('independent document parsing and normalized program model', () => {
     );
     expect(p.workouts[0].exercises.map((e) => e.name)).toEqual(['Squat']);
     expect(p.workouts[0].exercises[0].setCount).toBeNull();
-    expect(p.issues.length).toBeGreaterThan(1);
+    expect(p.notes).toContain('This paragraph describes a progressive overload strategy');
+    expect(p.issues.map((i) => i.source?.text)).toEqual(['(1:6 fail)']);
   });
   it('preserves duplicate exercise occurrences with separate editable IDs and exact matching identities', () => {
     const p = parse('Workout A\n- Bench 2x5\n- Bench 3x8');

@@ -15,7 +15,7 @@ export function parseSetBlock(source: string): SetPrescription[] {
     .trim()
     .replace(/^\(/, '')
     .replace(/\)$/, '')
-    .split(';')
+    .split(/;|\r?\n(?=\s*\d+\s*:)/)
     .map((s) => s.trim())
     .filter(Boolean)
     .map((entry) => {

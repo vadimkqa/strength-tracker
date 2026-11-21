@@ -55,8 +55,8 @@ async function checkZip(bytes: Uint8Array) {
 export async function extractDocument(file: File): Promise<ExtractedDocument> {
   if (file.size > 10_000_000) throw Error('Import a file smaller than 10 MB.');
   const format = file.name.split('.').pop()?.toLowerCase() || '';
-  if (!['txt', 'pdf', 'docx', 'csv', 'xlsx'].includes(format))
-    throw Error('Choose TXT, PDF, DOCX, CSV or XLSX.');
+  if (!['txt', 'pdf', 'docx', 'pages', 'csv', 'xlsx'].includes(format))
+    throw Error('Choose TXT, PDF, DOCX, Pages, CSV or XLSX.');
   const buffer = await file.arrayBuffer(),
     bytes = new Uint8Array(buffer);
   if (format === 'txt' || format === 'csv') {
@@ -75,6 +75,13 @@ export async function extractDocument(file: File): Promise<ExtractedDocument> {
       [],
     );
   }
+  if (format === 'pages') {
+    await checkZip(bytes);
+    const { unzipSync } = await import('fflate');
+    const { pagesText } = await import('./pages');
+    const result = pagesText(unzipSync(bytes, { filter: (f) => /^Index\/.*\.iwa$/.test(f.name) }));
+    return finalize(file.name, format, [{ text: result.text }], result.warnings);
+  }
   if (format === 'docx') {
     await checkZip(bytes);
     const mammoth = await import('mammoth');
@@ -84,12 +91,19 @@ export async function extractDocument(file: File): Promise<ExtractedDocument> {
     );
     // Parse inertly and read text only. Imported HTML, links and images never enter the app DOM.
     const dom = new DOMParser().parseFromString(result.value, 'text/html');
+    // textContent drops soft line breaks and joins nested paragraphs together.
+    const paragraphText = (node: Element) => {
+      const copy = node.cloneNode(true) as Element;
+      copy.querySelectorAll('br').forEach((br) => br.replaceWith('\n'));
+      copy.querySelectorAll('p').forEach((p) => p.append('\n'));
+      return copy.textContent?.trim() || '';
+    };
     const blocks: DocumentBlock[] = [];
     for (const node of Array.from(dom.body.children)) {
       if (node.tagName === 'TABLE')
         blocks.push({
           rows: Array.from(node.querySelectorAll('tr')).map((r) =>
-            Array.from(r.children).map((c) => c.textContent || ''),
+            Array.from(r.children).map((c) => paragraphText(c)),
           ),
         });
       else
@@ -97,9 +111,9 @@ export async function extractDocument(file: File): Promise<ExtractedDocument> {
           text:
             node.tagName === 'UL' || node.tagName === 'OL'
               ? Array.from(node.children)
-                  .map((c) => '- ' + c.textContent)
+                  .map((c, i) => (node.tagName === 'OL' ? `${i + 1}. ` : '- ') + paragraphText(c))
                   .join('\n')
-              : node.textContent || '',
+              : paragraphText(node),
         });
     }
     return finalize(
