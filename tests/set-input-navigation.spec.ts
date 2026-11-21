@@ -19,15 +19,13 @@ async function occlude(page: Page, height: number) {
   }, height);
 }
 async function accessible(page: Page) {
-  await expect
-    .poll(async () =>
-      page.evaluate(() => {
-        const input = document.activeElement!.getBoundingClientRect();
-        const accessory = document.querySelector('.set-input-navigation')!.getBoundingClientRect();
-        return input.top >= visualViewport!.offsetTop + 8 && input.bottom <= accessory.top - 8;
-      }),
-    )
-    .toBe(true);
+  await expect(page.locator('.set-input-navigation')).toHaveCSS('position', 'static');
+  await expect(page.locator('.set-input-navigation')).toHaveCSS('transform', 'none');
+  expect(
+    await page
+      .locator('.set-input-navigation')
+      .evaluate((el) => el.closest('.workout-controller') !== null),
+  ).toBe(true);
   await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeHidden();
   expect(await page.locator('main').evaluate((e) => e.scrollTop)).toBe(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -72,7 +70,9 @@ for (const size of [
       }
     }
     await expect(input(page, 'Weight', 3)).not.toBeFocused();
-    await expect(next(page)).toHaveCount(0);
+    await expect(
+      page.getByRole('group', { name: 'Set input navigation', exact: true }),
+    ).toHaveCount(1);
     await expect(page.locator('html')).not.toHaveAttribute('data-workout-keyboard', 'true');
     const after = await stored(page);
     expect(after.active.controller).toEqual(before.active.controller);
@@ -108,7 +108,9 @@ test('touch fallback keeps direct input focus, adapts to added/removed sets and 
   await expect(input(page, 'Weight', 2)).toBeFocused();
   await expect(next(page)).toHaveAccessibleName('Done entering this exercise');
   await next(page).tap();
-  await expect(next(page)).toHaveCount(0);
+  await expect(page.getByRole('group', { name: 'Set input navigation', exact: true })).toHaveCount(
+    1,
+  );
   await page.getByRole('button', { name: 'Add set to Bench Press', exact: true }).click();
   await expect(input(page, 'Weight', 2)).toHaveAttribute('enterkeyhint', 'next');
   await input(page, 'Weight', 2).focus();
@@ -202,7 +204,9 @@ for (const [intensity, count] of [
       await expect(input(page, 'Weight', set, 'Squat')).toBeFocused();
       await page.keyboard.press('Enter');
     }
-    await expect(next(page)).toHaveCount(0);
+    await expect(
+      page.getByRole('group', { name: 'Set input navigation', exact: true }),
+    ).toHaveCount(1);
     const after = await stored(page);
     // Existing blur handling materializes default card-expansion cache entries;
     // assert the visible expansion and every workout/controller behavior separately.

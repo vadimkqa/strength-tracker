@@ -14,7 +14,7 @@ The shared weight parser feeds live-set validation, previous performance, workou
 
 There is no schema migration, history rewrite, active-session reset, backup-format change or new dependency. Existing integer snapshots remain unchanged. Canonicalization applies to fields the user edits or explicitly completes, not stored history. Existing backup/restore paths carry original strings/numbers and draft active values without rewriting them. The legacy `completeSet` helper keeps its pre-existing empty-load behavior; the live controller continues to require an explicit load.
 
-The original accessory positioning and touch handling described by this decimal-entry change have been superseded by the [iPhone keyboard accessory correction](iphone-keyboard-accessory.md). The current accessory is one fixed body-level row positioned from visual viewport bounds, with protected native touch handling. See that document for current previews and required physical-device acceptance; the original decimal-entry screenshots below show the earlier implementation.
+The original accessory positioning and touch handling described by this decimal-entry change have been superseded by the [in-page workout editing replacement](inline-workout-editing.md). The current controls are a persistent ordinary in-page strip, with initial-press actions and no keyboard-edge positioning. See that document for current previews and required physical-device acceptance; the original decimal-entry screenshots below show the earlier implementation.
 
 ## iPhone-sized screenshots
 

@@ -3124,32 +3124,40 @@ html[data-workout-keyboard='true'] .live-set-controls button {
   scroll-margin-block: 8px;
 }
 
-/* One body-level fixed row: visualViewport supplies top; no document scroll offsets. */
+/* Ordinary in-page editing strip. No fixed/sticky layer, viewport offsets or transforms. */
 .set-input-navigation {
-  --accessory-safe-bottom: env(safe-area-inset-bottom, 0px);
-  position: fixed;
-  top: 0;
-  left: max(2px, env(safe-area-inset-left));
-  right: max(2px, env(safe-area-inset-right));
-  z-index: 120;
-  visibility: hidden;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1px;
-  padding: 4px 0;
-  height: 52px;
-  border-radius: 10px;
+  position: static;
+  margin: 8px 0 14px;
+  padding: 0;
   background: var(--background);
-  isolation: isolate;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
 }
-.set-input-navigation[data-positioned='true'] {
-  visibility: visible;
+.set-editing-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 28px;
+  color: var(--muted);
+  font-size: 10px;
 }
-.set-input-navigation[data-weight-controls='true'] {
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+.set-editing-context > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.set-editing-context output {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.set-editing-buttons {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 2px;
+  height: 44px;
+}
+.weight-adjustments {
+  display: contents;
 }
 .set-input-navigation button {
   min-width: 0;
@@ -3159,15 +3167,11 @@ html[data-workout-keyboard='true'] .live-set-controls button {
   border-color: var(--purple);
   background: var(--card);
   font-size: 12px;
+  touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  touch-action: none;
 }
-.set-input-navigation .set-navigation-buttons button {
-  font-size: 22px;
-}
-.weight-adjustments,
-.set-navigation-buttons {
-  display: contents;
+.set-input-navigation button:focus-visible {
+  outline-offset: -3px;
 }
 
 /* Muted completion accents preserve the original photographs and playing-card layout. */
@@ -3562,6 +3566,6 @@ html[data-workout-keyboard='true'] .live-set-controls button {
   line-height: 1.5;
 }
 
-.set-input-navigation button:focus-visible {
-  outline-offset: -3px;
+.exercise-sorting .set-input-navigation {
+  pointer-events: none;
 }

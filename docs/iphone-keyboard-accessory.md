@@ -1,4 +1,6 @@
-# iPhone keyboard accessory correction
+# Historical floating keyboard accessory correction (retired)
+
+**Superseded:** this floating design has been retired after continued physical-device failures. See [in-page workout editing](inline-workout-editing.md) for the current design, tests and pending device acceptance. The implementation and geometry tests discussed below are historical.
 
 Reported device: **iPhone 17 Pro, iOS 27.3, Safari Add to Home Screen standalone PWA**. The owner confirmed keyboard dismissal, moving/unresponsive buttons and app/native toolbar overlap on that physical device. Those observations take precedence over the previous desktop-emulation results.
 

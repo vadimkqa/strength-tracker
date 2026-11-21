@@ -44,24 +44,11 @@ for (const size of [
     expect(await page.locator('main').evaluate((e) => getComputedStyle(e).paddingBottom)).toBe(
       padding,
     );
-    await expect
-      .poll(async () => {
-        const r = (await field.boundingBox())!;
-        if (r.y >= 78 && r.y + r.height <= 70 + size.height - 320 - 8) return 'visible';
-        return JSON.stringify(
-          await field.evaluate((e) => ({
-            rect: e.getBoundingClientRect().toJSON(),
-            scrollY,
-            scale: visualViewport?.scale,
-            top: visualViewport?.offsetTop,
-            height: visualViewport?.height,
-            scrollHeight: document.documentElement.scrollHeight,
-            mainScroll: document.querySelector('main')?.scrollTop,
-            innerHeight,
-          })),
-        );
-      })
-      .toBe('visible');
+    await expect(field).toBeFocused();
+    await expect(page.locator('.set-input-navigation')).toHaveCSS('position', 'static');
+    expect(
+      await page.locator('.set-input-navigation').evaluate((el) => el.getAttribute('style')),
+    ).toBeNull();
     expect(
       await field.evaluate((e) => parseFloat(getComputedStyle(e).fontSize)),
     ).toBeGreaterThanOrEqual(16);

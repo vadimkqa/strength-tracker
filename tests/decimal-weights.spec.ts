@@ -82,19 +82,8 @@ for (const [width, height] of [
       Object.defineProperty(visualViewport!, 'offsetTop', { configurable: true, value: 40 });
       visualViewport!.dispatchEvent(new Event('resize'));
     }, height);
-    await expect
-      .poll(() =>
-        page.evaluate(() => {
-          const input = document.activeElement!.getBoundingClientRect(),
-            bar = document.querySelector('.set-input-navigation')!.getBoundingClientRect();
-          return (
-            input.top >= visualViewport!.offsetTop + 8 &&
-            input.bottom <= bar.top - 8 &&
-            bar.bottom <= visualViewport!.offsetTop + visualViewport!.height
-          );
-        }),
-      )
-      .toBe(true);
+    await expect(page.locator('.set-input-navigation')).toHaveCSS('position', 'static');
+    await expect(weight(page)).toBeFocused();
     await expect(plus(page)).not.toBeFocused();
     await plus(page).tap();
     await expect(weight(page)).toHaveValue('8');
@@ -114,9 +103,9 @@ for (const [width, height] of [
     await page.getByRole('button', { name: /^Next:/ }).tap();
     await expect(reps(page, 2)).toBeFocused();
     await expect(plus(page)).toHaveCount(0);
-    await page.getByRole('button', { name: 'Dismiss set keyboard', exact: true }).tap();
+    await page.getByRole('button', { name: 'Done editing Bench Press', exact: true }).tap();
     await expect(reps(page, 2)).not.toBeFocused();
-    await expect(page.locator('.set-input-navigation')).toHaveCount(0);
+    await expect(page.locator('.set-input-navigation')).toHaveCount(1);
     await page.evaluate(() => {
       Object.defineProperty(visualViewport!, 'height', { configurable: true, value: innerHeight });
       Object.defineProperty(visualViewport!, 'offsetTop', { configurable: true, value: 0 });
@@ -133,7 +122,7 @@ for (const [width, height] of [
     const done = page.getByRole('button', { name: 'Done entering this exercise', exact: true });
     await done.focus();
     await done.press('Enter');
-    await expect(page.locator('.set-input-navigation')).toHaveCount(0);
+    await expect(page.locator('.set-input-navigation')).toHaveCount(1);
   });
 }
 test('fractional completed sets remain exact in history, PR detail, chart and saved workout receipt', async ({
