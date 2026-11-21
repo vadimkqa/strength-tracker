@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { zipSync, strToU8 } from 'fflate';
+import { zipSync, unzipSync, strToU8 } from 'fflate';
 const basic = readFileSync('tests/fixtures/basic_gym_workout_plan.txt');
 async function settings(page: Page) {
   await page.goto('/strength-tracker/');
@@ -323,4 +323,85 @@ test('variable-length rotations navigate one, two and three-card weeks, preserve
   await expect(page.locator('.save-status')).toHaveText('Saved on this device');
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Row', exact: true })).toBeVisible();
+});
+
+test('real girlfriend Pages plan previews one week, two workouts and exact targets without acknowledgments', async ({
+  page,
+}) => {
+  await settings(page);
+  const before = await state(page);
+  await file(
+    page,
+    'Girlfriend Training Plan.pages',
+    readFileSync('tests/fixtures/girlfriend-training-plan.pages'),
+  );
+  const preview = page.getByLabel('Editable program preview', { exact: true });
+  await expect(preview).toContainText('1 week · 2 sessions · 12 exercises · 0 unresolved warnings');
+  await expect(preview.locator('.review-exercise')).toHaveCount(6);
+  await expect(preview).toContainText('Friday / Sunday · 6 exercises');
+  await expect(preview.getByText(/I reviewed this section/)).toHaveCount(0);
+  await preview.scrollIntoViewIfNeeded();
+  await preview.evaluate((el) =>
+    window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 16),
+  );
+  await page.screenshot({ path: 'test-results/girlfriend-plan-iphone.png' });
+  await preview.getByText('Plan notes', { exact: true }).click();
+  await expect(preview.getByLabel('GENERAL INSTRUCTIONS / OPTIONAL ACTIVITIES')).toHaveValue(
+    /first 2 weeks/,
+  );
+  await expect(preview.getByLabel('GENERAL INSTRUCTIONS / OPTIONAL ACTIVITIES')).toHaveValue(
+    /No fail = 4\+ reps left/,
+  );
+  await preview.getByText('Plan notes', { exact: true }).click();
+  await preview.locator('.review-exercise').first().scrollIntoViewIfNeeded();
+  await preview
+    .locator('.review-exercise')
+    .first()
+    .evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 16));
+  await page.screenshot({ path: 'test-results/girlfriend-leg-prescriptions-iphone.png' });
+  await preview.locator('.review-exercise > summary').first().click();
+  const legPress = preview.locator('.review-exercise').first();
+  await expect(legPress.getByLabel(/^Set \d+ minReps$/)).toHaveCount(3);
+  await expect(legPress.getByLabel(/^Set \d+ minReps$/).nth(2)).toHaveValue('12');
+  await expect(legPress.getByLabel(/^Set \d+ maxReps$/).nth(2)).toHaveValue('15');
+  await expect(legPress.getByLabel('Effort', { exact: true }).nth(0)).toHaveValue('no fail');
+  await expect(legPress.getByLabel('Effort', { exact: true }).nth(2)).toHaveValue('half fail');
+  // Preview edits never apply data; applying still requires explicit confirmation.
+  const apply = preview.getByRole('button', { name: /Apply/ });
+  await expect(apply).toBeDisabled();
+  await preview
+    .getByRole('combobox', { name: /^WORKOUT/ })
+    .selectOption({ label: 'Upper Body & Core' });
+  await expect(preview).toContainText('Saturday · 6 exercises');
+  await expect(preview.locator('.review-exercise')).toHaveCount(6);
+  await expect(preview).toContainText('T-bar Row (chest supported)');
+  await preview.evaluate((el) =>
+    window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 16),
+  );
+  await page.screenshot({ path: 'test-results/girlfriend-upper-iphone.png' });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await preview.getByRole('button', { name: 'Cancel preview', exact: true }).click();
+  expect(await state(page)).toEqual(before);
+});
+
+test('DOCX soft breaks and paragraph boundaries retain numbered exercises and split sets', async ({
+  page,
+}) => {
+  await settings(page);
+  const archive = unzipSync(docx());
+  archive['word/document.xml'] =
+    strToU8(`<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>
+  <w:p><w:r><w:t>Program: Paragraphs</w:t></w:r></w:p>
+  <w:p><w:r><w:t>Begin with 2 working sets for the first 2 weeks.</w:t><w:br/><w:t>Rest 60–120 seconds.</w:t></w:r></w:p>
+  <w:p><w:r><w:t>Workout A: Legs</w:t><w:br/><w:t>Friday OR Sunday</w:t></w:r></w:p>
+  <w:p><w:r><w:t>1. Squat</w:t><w:br/><w:t>(1:8 no fail;</w:t><w:br/><w:t>2:10 half fail)</w:t></w:r></w:p>
+  <w:p><w:r><w:t>2. Curl</w:t></w:r></w:p><w:p><w:r><w:t>(1:12 half fail; 2:12-15 half fail)</w:t></w:r></w:p>
+  </w:body></w:document>`);
+  await file(page, 'paragraphs.docx', Buffer.from(zipSync(archive)));
+  const preview = page.getByLabel('Editable program preview', { exact: true });
+  await expect(preview).toContainText('1 week · 1 sessions · 2 exercises · 0 unresolved warnings');
+  await expect(preview).toContainText('Friday OR Sunday · 2 exercises');
+  await expect(preview.locator('.review-exercise')).toHaveCount(2);
+  await preview.locator('.review-exercise > summary').first().click();
+  await expect(preview.getByLabel(/^Set \d+ minReps$/).nth(1)).toHaveValue('10');
 });

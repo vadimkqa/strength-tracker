@@ -156,7 +156,7 @@ export function PlanImporter({ onApply }: Props) {
       <input
         id="plan-file"
         type="file"
-        accept=".txt,.pdf,.docx,.csv,.xlsx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+        accept=".txt,.pdf,.docx,.pages,.csv,.xlsx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
         disabled={busy}
         onChange={(e) => {
           const f = e.target.files?.[0];

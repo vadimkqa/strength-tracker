@@ -58,6 +58,8 @@ export interface TrainingProgram {
   id: string;
   name: string;
   source: { name: string; format: string; text: string };
+  /** General guidance, separate from exercise prescriptions. Optional for older backups. */
+  notes?: string;
   workouts: ProgramWorkout[];
   rotation: { weeks: number[]; repeat: boolean } | null;
   issues: ImportIssue[];
@@ -188,6 +190,7 @@ export function assertProgram(value: unknown): asserts value is TrainingProgram 
     p.schemaVersion !== 1 ||
     typeof p.id !== 'string' ||
     typeof p.name !== 'string' ||
+    (p.notes !== undefined && typeof p.notes !== 'string') ||
     !p.source ||
     typeof p.source.text !== 'string' ||
     typeof p.source.format !== 'string' ||

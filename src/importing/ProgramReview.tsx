@@ -66,6 +66,17 @@ export function ProgramReview({ program: p, change, onApply, cancel, stale }: Pr
         {p.workouts.reduce((n, w) => n + w.exercises.length, 0)} exercises ·{' '}
         {programIssues(p).filter((i) => !i.reviewed).length} unresolved warnings
       </p>
+      <details>
+        <summary>Plan notes</summary>
+        <label>
+          GENERAL INSTRUCTIONS / OPTIONAL ACTIVITIES
+          <textarea
+            rows={5}
+            value={p.notes || ''}
+            onChange={(e) => edit((p) => (p.notes = e.target.value))}
+          />
+        </label>
+      </details>
       {p.issues.length > 0 && (
         <details open>
           <summary>Unsupported sections and document warnings ({p.issues.length})</summary>
@@ -146,6 +157,11 @@ export function ProgramReview({ program: p, change, onApply, cancel, stale }: Pr
       >
         Add workout
       </button>
+      {w && (
+        <p className="muted">
+          {w.day || 'Schedule not specified'} · {w.exercises.length} exercises
+        </p>
+      )}
       {w && (
         <>
           <details>

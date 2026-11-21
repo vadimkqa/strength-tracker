@@ -10,8 +10,6 @@ import {
   type TargetSet,
 } from './model';
 import type { ExtractedDocument } from './extraction';
-const weekday =
-  /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b[\s;:–—-]*(.*)$/i;
 const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const intensity = (s: string) => /\b(?:HARD|HEAVY|EASY|MID)\b/i.exec(s)?.[0].toUpperCase() ?? null;
 const cleanIntensity = (s: string) =>
@@ -187,6 +185,7 @@ export function parseProgram(doc: ExtractedDocument): TrainingProgram {
     id: `program-${stableId(doc.name)}`,
     name: '',
     source: { name: doc.name, format: doc.format, text: doc.text },
+    notes: '',
     workouts: [],
     rotation: null,
     issues: doc.warnings.map((w) => issue(w)),
@@ -196,12 +195,27 @@ export function parseProgram(doc: ExtractedDocument): TrainingProgram {
     group: string | null = null,
     line = 0;
   const weeks = new Set<number>();
+  const explicitSets = new Set<string>();
+  let noteSection = false;
+  function note(raw: string) {
+    p.notes = [p.notes, raw].filter(Boolean).join('\n');
+  }
+  // Alternatives describe one slot, never multiple sessions. Keep the choice editable.
+  const dayWord =
+    '(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Mon|Tue|Wed|Thu|Fri|Sat|Sun)';
+  const schedule = new RegExp(
+    `^(${dayWord}(?:\\s*(?:/|or)\\s*${dayWord})*)(?:\\s*[;:–—-]\\s*|\\s+|$)(.*)$`,
+    'i',
+  );
+  const scheduleOnly = new RegExp(`^${dayWord}(?:\\s*(?:/|or)\\s*${dayWord})*[.:]?$`, 'i');
+
   function workout(
     name: string,
     day: string | null,
     ref: SourceRef,
     sessionIntensity: string | null = null,
   ) {
+    noteSection = false;
     const labels = [...name.matchAll(/\b(HARD|HEAVY|EASY|MID)\b/gi)].map((m) =>
       m[1].toUpperCase().replace('HEAVY', 'HARD'),
     );
@@ -267,25 +281,51 @@ export function parseProgram(doc: ExtractedDocument): TrainingProgram {
       p.name = value.replace(/^[^:]+:\s*/, '');
       return;
     }
-    if (/^(?:note|notes|warning|instructions|progression|rest days?)\b/i.test(value)) {
-      if (/^warning\b|cut.?off|truncat|incomplete|ambig|contradict|unparseable/i.test(value))
-        unsupported(value, ref);
-      else {
-        const ex = current?.exercises.at(-1);
-        if (ex) {
-          ex.notes += '\n' + raw;
-          ex.source.push(ref);
-        } else current?.source.push(ref);
-      }
+    const plain = value.replace(/^(?:[-*•]|\d+[.)])\s*/, '');
+    if (
+      /^(?:general (?:instructions|guidance)|instructions|plan notes|effort (?:levels|definitions)|optional (?:activities|cardio))\s*:?$/i.test(
+        plain,
+      )
+    ) {
+      noteSection = true;
+      note(raw);
       return;
     }
-    const dm = weekday.exec(value);
-    if (dm) {
-      const day = dayNames.find((d) =>
-        d.toLowerCase().startsWith(dm[1].toLowerCase().slice(0, 3)),
-      )!;
-      if (/^rest\b/i.test(dm[2])) return;
-      workout(dm[2] || day, day, ref, intensity(dm[2]));
+    if (/^warning\b|cut.?off|truncat|incomplete|ambig|contradict|unparseable/i.test(plain)) {
+      unsupported(value, ref);
+      return;
+    }
+    const guidance =
+      /^(?:notes?\b|progression\b|rest (?:days?\b|\d)|(?:start|begin) with\b|increase (?:the )?weights?\b|warm[ -]?up\b|no fail\s*=|half fail\s*=|fail\s*=|focus\s*:|\d+(?:\s*[-–—]\s*\d+)? workouts? per week\b|optional:\s*\d+.*(?:walking|cardio|cycling|minutes?|min\b))/i.test(
+        plain,
+      );
+    if (guidance) {
+      const ex = current?.exercises.at(-1);
+      if (/^notes?\s*:/i.test(plain) && ex && !noteSection) {
+        ex.notes += '\n' + raw;
+        ex.source.push(ref);
+      } else note(raw);
+      return;
+    }
+    const scheduled = schedule.exec(value);
+    if (scheduled) {
+      const day = scheduled[1].replace(new RegExp(dayWord, 'gi'), (d) =>
+        dayNames.find((name) => name.toLowerCase().startsWith(d.toLowerCase().slice(0, 3)))!,
+      );
+      const title = scheduled[2].replace(/:$/, '').trim();
+      if (/^rest\b/i.test(title)) return;
+      if (!title && current && !current.exercises.length) {
+        current.day = day;
+        current.source.push(ref);
+      } else workout(title || day, day, ref, intensity(title));
+      return;
+    }
+    if (/^schedule\s*:/i.test(value) && current) {
+      const days = value.replace(/^schedule\s*:\s*/i, '');
+      if (scheduleOnly.test(days)) {
+        current.day = days;
+        current.source.push(ref);
+      } else unsupported(value, ref);
       return;
     }
     const gh = /^(superset|circuit)\b\s*(.*)/i.exec(value);
@@ -312,21 +352,23 @@ export function parseProgram(doc: ExtractedDocument): TrainingProgram {
         return;
       }
       const sets = parseSetBlock(value);
-      ex.sets = sets.map((s) => ({
+      const parsedSets = sets.map((s) => ({
         ...targetFromText(s.effort, ref),
         number: s.number,
         minReps: s.minReps,
         maxReps: s.maxReps,
         effort: s.effort || null,
       }));
-      ex.setCount = sets.length;
+      ex.sets = explicitSets.has(ex.id) ? [...ex.sets, ...parsedSets] : parsedSets;
+      explicitSets.add(ex.id);
+      ex.setCount = ex.sets.length;
       ex.source.push(ref);
       ex.issues = ex.issues.filter(
         (i) =>
           !i.message.startsWith('Set count is unspecified') &&
           !i.message.startsWith('Target reps are unspecified'),
       );
-      ex.issues.push(...setWarnings(sets).map((m) => issue(m, ref)));
+      ex.notes += '\n' + raw;
       return;
     }
     if (/^\(?\s*\d+\s*[x×]\s*\d/.test(value)) {
@@ -344,11 +386,12 @@ export function parseProgram(doc: ExtractedDocument): TrainingProgram {
     }
     const numbered = /^\s*(?:[-*•]|\d+[.)]|[A-Z]\d+[.)]?)\s*/.test(value);
     const prescribed = /\b\d+\s*[x×]\s*(?:\d|AMRAP)|\b\d+\s*sets?\b/i.test(value);
+    const headingValue = value.replace(/^#{1,6}\s*/, '');
     const heading =
       !numbered &&
       !prescribed &&
       !/^Optional:|^Core:/i.test(value) &&
-      (/^(?:Workout|Session)\s+\S/i.test(value) ||
+      (/^(?:Workout|Session)\s*[:–—-]?\s+[A-Z0-9]/i.test(headingValue) ||
         /^Day\s+(?:\d+|[A-Z])\b/i.test(value) ||
         /^(?:Upper|Lower|Full[ -]body|Push|Pull|Legs)(?:\s+[A-F1-6])?\s*[:(]?[\w\s)]*$/i.test(
           value,
@@ -359,6 +402,10 @@ export function parseProgram(doc: ExtractedDocument): TrainingProgram {
         /:$/.test(value));
     if (heading) {
       workout(value.replace(/^#{1,6}\s*/, '').replace(/:$/, ''), null, ref, intensity(value));
+      return;
+    }
+    if (noteSection || (!numbered && !prescribed && /[.!?](?:\s|$)/.test(value))) {
+      note(raw);
       return;
     }
     if (!p.name && !current && !numbered && !prescribed) {
@@ -530,12 +577,35 @@ export function parseProgram(doc: ExtractedDocument): TrainingProgram {
       ...(block.sheet ? { sheet: block.sheet } : {}),
     };
     if (block.rows) table(block.rows, extra);
-    else for (const l of (block.text || '').split(/\r\n?|\n/)) text(l, extra);
+    else {
+      const lines = (block.text || '').split(/\r\n?|\n|\u2028|\u2029/);
+      for (let i = 0; i < lines.length; i++) {
+        let raw = lines[i];
+        if (/^\s*\(\s*\d+\s*:/.test(raw) && !/\)\s*$/.test(raw)) {
+          // A wrapped prescription belongs to the preceding numbered exercise.
+          while (
+            i + 1 < lines.length &&
+            !/\)\s*$/.test(raw) &&
+            /^\s*(?:\d+\s*:|(?:(?:no|half)\s+)?fail\b)/i.test(lines[i + 1])
+          )
+            raw += '\n' + lines[++i];
+        }
+        const start = line + 1;
+        text(raw, extra);
+        line = start + raw.split('\n').length - 1;
+      }
+    }
   }
   p.name = p.name || doc.name.replace(/\.[^.]+$/, '');
   if (weeks.size > 1) p.rotation = { weeks: [...weeks].sort((a, b) => a - b), repeat: true };
   for (const w of p.workouts)
     for (const e of w.exercises) {
+      if (explicitSets.has(e.id))
+        e.issues.push(
+          ...setWarnings(
+            e.sets.map((s) => ({ ...s, effort: s.effort || '', source: s.source.text })),
+          ).map((m) => issue(m, e.source.at(-1))),
+        );
       const nums = e.sets.map((s) => s.number);
       if (
         nums.length &&

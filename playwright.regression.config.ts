@@ -7,6 +7,7 @@ export default defineConfig({
     browserName === 'webkit'
       ? [
           '**/mobile-reliability.spec.ts',
+          '**/universal-import.spec.ts',
           '**/set-input-navigation.spec.ts',
           '**/carousel-completion.spec.ts',
           '**/records.spec.ts',
