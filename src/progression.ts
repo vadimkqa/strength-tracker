@@ -38,8 +38,10 @@ export interface ProgressionSuggestion {
   previous?: ComparableSession;
   targets: ProgressionTarget[];
 }
-const norm = (s: string | undefined | null) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+const norm = (s: unknown) =>
+  typeof s === 'string' ? s.trim().replace(/\s+/g, ' ').toLowerCase() : '';
 export function progressionIntensity(w: Workout, e: Exercise): string {
+  if (e.exerciseIntensity != null && typeof e.exerciseIntensity !== 'string') return 'unknown';
   const saved = savedIntensity(w, e);
   return saved !== 'unknown' ? saved : norm(e.exerciseIntensity) === 'mid' ? 'mid' : 'unknown';
 }
@@ -50,14 +52,18 @@ function repRange(e: Exercise, s: SetEntry): Range | null {
       ? { min: min!, max: max! }
       : null;
   }
-  const m = /^(\d+)(?:\s*[-–—]\s*(\d+))?(?:\s*reps?)?$/i.exec((e.targetReps || '').trim());
+  const m = /^(\d+)(?:\s*[-–—]\s*(\d+))?(?:\s*reps?)?$/i.exec(
+    (typeof e.targetReps === 'string' ? e.targetReps : '').trim(),
+  );
   return m && Number(m[1]) > 0 && Number(m[2] || m[1]) >= Number(m[1])
     ? { min: Number(m[1]), max: Number(m[2] || m[1]) }
     : null;
 }
 function effort(s: SetEntry) {
   const p = s.prescription;
-  return [norm(p?.effort), p?.targetRpe ?? null, p?.targetRir ?? null];
+  const text =
+    p?.effort != null && typeof p.effort !== 'string' ? 'Unrecognized effort' : norm(p?.effort);
+  return [text, p?.targetRpe ?? null, p?.targetRir ?? null];
 }
 function signature(e: Exercise) {
   return JSON.stringify(
@@ -76,7 +82,7 @@ function complete(e: Exercise) {
   return (
     !e.skipped &&
     !!e.sets.length &&
-    numbers.every((n) => n !== null) &&
+    numbers.every((n) => Number.isInteger(n) && n! > 0) &&
     new Set(numbers).size === numbers.length &&
     e.sets.every((s) => loggedSet(e, s))
   );

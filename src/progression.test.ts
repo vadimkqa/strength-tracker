@@ -275,6 +275,17 @@ describe('conservative progression from saved comparable sessions', () => {
       expect(suggest([h]).action).toBe('insufficient');
     }
   });
+  it('withholds progression for inconsistent legacy target metadata instead of crashing', () => {
+    const h = session(1, 8),
+      w = active();
+    for (const x of [h, w])
+      x.exercises[0].sets.forEach((s) => (s.prescription!.effort = 42 as unknown as string));
+    expect(suggest([h], w).action).toBe('maintain');
+    for (const x of [h, w]) x.exercises[0].exerciseIntensity = 42 as unknown as string;
+    expect(suggest([h], w).action).toBe('insufficient');
+    delete h.exercises[0].sets[0].prescription!.number;
+    expect(comparableSessions(w, w.exercises[0], [h])).toEqual([]);
+  });
   it('handles actual bodyweight, assistance and zero load without inventing resistance', () => {
     const h = session(1, 6, '0'),
       w = active();
