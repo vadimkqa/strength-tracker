@@ -283,7 +283,7 @@ describe('conservative progression from saved comparable sessions', () => {
     expect(suggest([h], w).action).toBe('maintain');
     for (const x of [h, w]) x.exercises[0].exerciseIntensity = 42 as unknown as string;
     expect(suggest([h], w).action).toBe('insufficient');
-    delete h.exercises[0].sets[0].prescription!.number;
+    delete (h.exercises[0].sets[0].prescription as { number?: number | null }).number;
     expect(comparableSessions(w, w.exercises[0], [h])).toEqual([]);
   });
   it('handles actual bodyweight, assistance and zero load without inventing resistance', () => {
