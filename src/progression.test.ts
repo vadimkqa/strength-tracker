@@ -225,6 +225,14 @@ describe('conservative progression from saved comparable sessions', () => {
     expect(s.targets[0]).toMatchObject({ weight: '99', reps: '5' });
     expect(suggest([session(1, 5), session(2, 4), session(3, 4)]).action).toBe('recovery');
   });
+  it('also recognizes repeated load decline without calling a load/rep tradeoff a failure', () => {
+    const down = suggest([session(1, 6, '100'), session(2, 6, '99'), session(3, 6, '98')]);
+    expect(down.action).toBe('recovery');
+    expect(down.targets[0].weight).toBe('97');
+    expect(suggest([session(1, 6, '100'), session(2, 7, '99'), session(3, 8, '98')]).action).toBe(
+      'maintain',
+    );
+  });
   it('does not borrow from another program, range, count, equipment or unapproved rename', () => {
     for (const type of ['program', 'range', 'count', 'name', 'duplicate', 'rest']) {
       const h = session(1),

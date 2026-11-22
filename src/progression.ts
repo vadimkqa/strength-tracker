@@ -256,18 +256,31 @@ export function progressionSuggestion(
       a.sets.every((s, i) => normalizedWeight(s.weight) === normalizedWeight(b.sets[i].weight));
   const below = (ex: Exercise) => ex.sets.some((s, i) => Number(s.reps) < ranges[i]!.min);
   const total = (ex: Exercise) => ex.sets.reduce((n, s) => n + Number(s.reps), 0);
-  if (
+  const declined = (recent: Exercise, older: Exercise) =>
+    recent.sets.every(
+      (s, i) =>
+        weightValue(s.weight)! <= weightValue(older.sets[i].weight)! &&
+        Number(s.reps) <= Number(older.sets[i].reps),
+    ) &&
+    recent.sets.some(
+      (s, i) =>
+        weightValue(s.weight)! < weightValue(older.sets[i].weight)! ||
+        Number(s.reps) < Number(older.sets[i].reps),
+    );
+  const repeatedDecline =
     sessions.length >= 3 &&
-    sessions
-      .slice(1, 3)
-      .every(
-        (s) =>
-          sameLoads(previous.exercise, s.exercise) &&
-          (!hasEffortTarget(e) || effortConfirmed(s.exercise)),
-      ) &&
+    declined(previous.exercise, sessions[1].exercise) &&
+    declined(sessions[1].exercise, sessions[2].exercise);
+  const fixedLoadDecline =
+    sessions.length >= 3 &&
+    sessions.slice(1, 3).every((s) => sameLoads(previous.exercise, s.exercise)) &&
     ((below(previous.exercise) && below(sessions[1].exercise)) ||
       (total(previous.exercise) < total(sessions[1].exercise) &&
-        total(sessions[1].exercise) < total(sessions[2].exercise)))
+        total(sessions[1].exercise) < total(sessions[2].exercise)));
+  if (
+    sessions.length >= 3 &&
+    sessions.slice(1, 3).every((s) => !hasEffortTarget(e) || effortConfirmed(s.exercise)) &&
+    (repeatedDecline || fixedLoadDecline)
   ) {
     const reduced =
       increment && loadKind(e) === 'external'

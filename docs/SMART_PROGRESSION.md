@@ -15,7 +15,7 @@ Comparisons require an exact exercise identity or an explicitly saved equivalent
 - **Increase reps:** one additional rep total on the first eligible set, at the same weight, within the prescribed range.
 - **Increase weight:** two comparable sessions at the upper bound, with matching loads and any required effort evidence. Start at the lower rep bound. Proposed increases are capped at 5%.
 - **Maintain:** one good session is insufficient for a weight increase. Easy/MID and technique/recovery sessions stay conservative; they are not failed progression attempts.
-- **Recovery / reduce:** at least three comparable sessions, with repeated decline at matching loads or repeated below-range reps. Offer one increment less only when it is positive and no more than 5%; otherwise offer a neutral recovery message. This is not a fatigue, overtraining or injury diagnosis.
+- **Recovery / reduce:** at least three comparable sessions, with repeated rep decline at matching loads, repeated decreases in logged load without improved reps, or repeated below-range reps. Load/rep tradeoffs are not automatically labeled decline. Offer one increment less only when it is positive and no more than 5%; otherwise offer a neutral recovery message. This is not a fatigue, overtraining or injury diagnosis.
 - **Not enough history:** missing intensity, unspecified/inconsistent rep ranges, incomparable plans/prescriptions, unknown zero-load resistance or assisted load. Previous data may be shown neutrally, without inventing targets.
 
 Bodyweight rep suggestions use only logged added load; no body mass is invented. Assistance is never treated as resistance. Fixed prescribed weights remain fixed. Rep, weight and estimated-strength PRs retain the existing analytics rules.
