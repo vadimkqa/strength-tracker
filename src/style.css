@@ -3569,3 +3569,66 @@ html[data-workout-keyboard='true'] .live-set-controls button {
 .exercise-sorting .set-input-navigation {
   pointer-events: none;
 }
+
+/* In-flow, optional progression: no keyboard or viewport positioning. */
+.exercise-progression {
+  margin: 0 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px 12px;
+  font-size: 13px;
+}
+.exercise-progression summary {
+  cursor: pointer;
+  color: var(--purple);
+  min-height: 44px;
+  padding: 12px 0;
+}
+.exercise-progression p {
+  margin: 8px 0;
+}
+.exercise-progression ul {
+  padding-left: 20px;
+}
+.progression-increment {
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+  padding-top: 12px;
+  min-width: 0;
+}
+.progression-increment label {
+  display: block;
+}
+.progression-increment input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.progression-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+.progression-actions button {
+  min-height: 44px;
+}
+.progression-increment small {
+  display: block;
+  color: var(--muted);
+}
+.progression-timeline ol {
+  padding: 0;
+  list-style: none;
+}
+.progression-timeline li {
+  display: grid;
+  gap: 4px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.progression-timeline small,
+.progression-timeline time {
+  color: var(--muted);
+  font-size: 12px;
+}

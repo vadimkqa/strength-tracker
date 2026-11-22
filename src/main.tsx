@@ -1,3 +1,4 @@
+import { ProgressionProvider, ProgressionSettings } from './Progression';
 import { RecordsDashboard } from './RecordsDashboard';
 import { WorkoutCompletion } from './WorkoutCompletion';
 import { saveWorkoutCompletion, savedWorkoutName } from './workout-completion';
@@ -695,63 +696,67 @@ function App() {
                 <p className="workout-duration muted">
                   Workout duration: {formatTime((now - active.started) / 1000)}
                 </p>
-                <SortableWorkout
-                  key={active.id}
-                  workout={active}
-                  change={(fn) => change((d) => ({ ...d, active: d.active ? fn(d.active) : null }))}
-                >
-                  <WorkoutScreens
+                <ProgressionProvider data={data} change={change}>
+                  <SortableWorkout
+                    key={active.id}
                     workout={active}
-                    now={now}
-                    change={activeChange}
-                    finish={requestCompletion}
+                    change={(fn) =>
+                      change((d) => ({ ...d, active: d.active ? fn(d.active) : null }))
+                    }
                   >
-                    <h2 className="visually-hidden">Exercises</h2>
-                    {active.exercises.map((ex) => (
-                      <SortableExercise
-                        key={ex.id}
-                        exercise={ex}
-                        workout={active}
-                        change={activeChange}
-                      />
-                    ))}
-                    <details className="workout-streak-options">
-                      <summary>Streak eligibility</summary>
-                      <label className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={!!active.streakExcluded}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            activeChange((w) => ({ ...w, streakExcluded: checked }));
-                          }}
+                    <WorkoutScreens
+                      workout={active}
+                      now={now}
+                      change={activeChange}
+                      finish={requestCompletion}
+                    >
+                      <h2 className="visually-hidden">Exercises</h2>
+                      {active.exercises.map((ex) => (
+                        <SortableExercise
+                          key={ex.id}
+                          exercise={ex}
+                          workout={active}
+                          change={activeChange}
                         />
-                        Practice/test workout (exclude from Strength Streak)
-                      </label>
-                      <p className="muted">
-                        This session will still be saved, without streak credit.
-                      </p>
-                    </details>
-                    <button
-                      className="primary full"
-                      disabled={
-                        active.controller?.phase === 'set' || pendingLogs(active).length > 0
-                      }
-                      onClick={requestCompletion}
-                    >
-                      Finish & save workout
-                    </button>
-                    <button
-                      className="danger full"
-                      onClick={() => {
-                        if (confirm('Discard this active workout? Saved history will be kept.'))
-                          change((d) => ({ ...d, active: null }));
-                      }}
-                    >
-                      Discard workout
-                    </button>
-                  </WorkoutScreens>
-                </SortableWorkout>
+                      ))}
+                      <details className="workout-streak-options">
+                        <summary>Streak eligibility</summary>
+                        <label className="checkbox-label">
+                          <input
+                            type="checkbox"
+                            checked={!!active.streakExcluded}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              activeChange((w) => ({ ...w, streakExcluded: checked }));
+                            }}
+                          />
+                          Practice/test workout (exclude from Strength Streak)
+                        </label>
+                        <p className="muted">
+                          This session will still be saved, without streak credit.
+                        </p>
+                      </details>
+                      <button
+                        className="primary full"
+                        disabled={
+                          active.controller?.phase === 'set' || pendingLogs(active).length > 0
+                        }
+                        onClick={requestCompletion}
+                      >
+                        Finish & save workout
+                      </button>
+                      <button
+                        className="danger full"
+                        onClick={() => {
+                          if (confirm('Discard this active workout? Saved history will be kept.'))
+                            change((d) => ({ ...d, active: null }));
+                        }}
+                      >
+                        Discard workout
+                      </button>
+                    </WorkoutScreens>
+                  </SortableWorkout>
+                </ProgressionProvider>
               </>
             )}
           </>
@@ -926,6 +931,7 @@ function App() {
             <PlanImporter onApply={applyPlan} />
             <ProgramEditor data={data} change={change} />
             <CalendarSettings data={data} change={change} />
+            <ProgressionSettings data={data} change={change} />
             <section className="card">
               <h2>Rest preferences</h2>
               <label htmlFor="default-rest">DEFAULT REST FOR NEW EXERCISES</label>

@@ -1,3 +1,8 @@
+import {
+  assertProgressionPreferences,
+  mergeProgressionPreferences,
+  type ProgressionPreferences,
+} from './progression-preferences';
 import { normalizedWeight, weightValue } from './weight';
 import {
   assertRecordPreferences,
@@ -27,6 +32,8 @@ export interface SetEntry {
   prescription?: SetPrescription;
 }
 export interface Exercise {
+  /** Optional explicit self-report for this session; invalidated by changed logs or targets. */
+  progressionEffort?: { signature: string };
   imageUrl?: string;
   groupLabel?: string;
   skipped?: boolean;
@@ -64,6 +71,7 @@ export interface Workout {
   exercises: Exercise[];
 }
 export interface Data {
+  progressionPreferences?: ProgressionPreferences;
   prPreferences?: RecordPreferences;
   streak?: StreakState;
   programs?: SavedProgram[];
@@ -100,6 +108,8 @@ function validWorkout(w: unknown): w is Workout {
     x.exercises.every(
       (e) =>
         typeof e.name === 'string' &&
+        (e.progressionEffort === undefined ||
+          (e.progressionEffort && typeof e.progressionEffort.signature === 'string')) &&
         (typeof e.rest === 'number' || e.rest === null) &&
         Array.isArray(e.sets) &&
         e.sets.every(
@@ -140,6 +150,7 @@ export function parseData(input: unknown): Data {
   if (d.trainingProgram) assertProgram(d.trainingProgram);
   assertLibrary(d);
   assertRecordPreferences(d.prPreferences);
+  assertProgressionPreferences(d.progressionPreferences);
   if (d.streak !== undefined) assertStreak(d.streak);
   if (
     d.rotation &&
@@ -309,6 +320,10 @@ export function mergeBackup(current: Data, incoming: Data): Data {
     ...incoming,
     ...projection,
     prPreferences: mergeRecordPreferences(current.prPreferences, incoming.prPreferences),
+    progressionPreferences: mergeProgressionPreferences(
+      current.progressionPreferences,
+      incoming.progressionPreferences,
+    ),
     streak,
     active,
     history: history.sort((a, b) => b.started - a.started),

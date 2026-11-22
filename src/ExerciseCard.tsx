@@ -1,3 +1,4 @@
+import { ExerciseProgression } from './Progression';
 import { normalizedWeight, weightDraft, weightValue } from './weight';
 import { advanceSetInput } from './SetInputNavigation';
 import { removeLiveSet } from './live-sets';
@@ -157,6 +158,7 @@ export function ExerciseCard({ workout: w, exercise: e, change, sort }: Props) {
         aria-hidden={!open}
       >
         <div className="exercise-content">
+          <ExerciseProgression workout={w} exercise={e} />
           <div
             className="setrow performance-row set-head"
             aria-label={`${e.name} set logging columns`}
