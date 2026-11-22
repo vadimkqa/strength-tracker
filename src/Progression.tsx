@@ -2,6 +2,7 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from 're
 import type { Data, Exercise, Workout } from './data';
 import { recordIdentity } from './records';
 import { templateLabel } from './workouts';
+import { setNumber } from './performance';
 import { normalizedWeight, weightValue } from './weight';
 import {
   applyProgressionTarget,
@@ -219,8 +220,7 @@ export function ExerciseProgression({
           <ul>
             {previous.exercise.sets.map((s, i) => (
               <li key={i}>
-                Set {suggestion.targets[i]?.number || s.prescription?.number || i + 1}:{' '}
-                {normalizedWeight(s.weight)} kg × {s.reps}
+                Set {setNumber(s, i) ?? '?'}: {normalizedWeight(s.weight)} kg × {s.reps}
               </li>
             ))}
           </ul>

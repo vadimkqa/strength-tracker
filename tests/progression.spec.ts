@@ -111,9 +111,15 @@ test('a running timer and completed fields are never changed by using a target',
 test('effort confirmation is optional, requires completed sets and persists only on this active session', async ({
   page,
 }) => {
-  const initial = await seedProgression(page, true, 'no fail');
+  const initial = await seedProgression(page, true, 'no fail', (d) => {
+    d.history.at(-1)!.exercises[0].sets[0].reps = '4';
+  });
   await section(page).getByText('Progression', { exact: true }).click();
   await expect(section(page)).toContainText('no matching effort confirmation');
+  await expect(section(page).locator('ul').first().locator('li')).toHaveText([
+    'Set 1: 100 kg × 4',
+    'Set 2: 100 kg × 8',
+  ]);
   const checkbox = section(page).getByRole('checkbox', {
     name: 'Confirm prescribed effort for Bench Press',
     exact: true,

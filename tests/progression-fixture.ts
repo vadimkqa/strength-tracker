@@ -35,8 +35,14 @@ export function progressionFixture(top = false, effort = '') {
   d.progressionPreferences = { enabled: true, increments: {} };
   return d;
 }
-export async function seedProgression(page: Page, top = false, effort = '') {
+export async function seedProgression(
+  page: Page,
+  top = false,
+  effort = '',
+  adjust?: (data: ReturnType<typeof progressionFixture>) => void,
+) {
   const d = progressionFixture(top, effort);
+  adjust?.(d);
   await page.addInitScript((d) => {
     if (!localStorage.getItem('strength-tracker-v1'))
       localStorage.setItem('strength-tracker-v1', JSON.stringify(d));
