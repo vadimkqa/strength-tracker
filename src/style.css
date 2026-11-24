@@ -3569,3 +3569,117 @@ html[data-workout-keyboard='true'] .live-set-controls button {
 .exercise-sorting .set-input-navigation {
   pointer-events: none;
 }
+
+.streak-freeze,
+.freeze-hero-status {
+  --freeze-ink: #c6bfdf;
+  --freeze-fill: #302b3c;
+}
+.freeze-hero-status {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  margin: 8px 0 14px;
+  color: var(--freeze-ink);
+}
+.freeze-hero-status small,
+.freeze-endpoints small,
+.freeze-periods small {
+  color: var(--muted);
+}
+.freeze-flake,
+.week-status.frozen {
+  color: #c6bfdf;
+}
+.freeze-picker {
+  display: grid;
+  gap: 12px;
+}
+.freeze-picker p,
+.freeze-periods p {
+  margin: 0;
+}
+.freeze-endpoints {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.freeze-endpoints > div {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px;
+  min-width: 0;
+}
+.freeze-month {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.freeze-month button {
+  padding: 0;
+  width: 44px;
+  font-size: 22px;
+}
+.freeze-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px 0;
+}
+.freeze-calendar small {
+  text-align: center;
+  color: var(--muted);
+  padding-bottom: 5px;
+}
+.freeze-calendar button {
+  padding: 0;
+  min-height: 44px;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+}
+.freeze-calendar button:hover,
+.freeze-calendar button[aria-current='date'] {
+  border-color: var(--border);
+}
+.freeze-calendar button[aria-pressed='true'] {
+  background: var(--freeze-fill);
+  color: var(--freeze-ink);
+}
+.freeze-calendar button[data-edge='true'] {
+  border-radius: 8px;
+  background: var(--freeze-ink);
+  color: var(--background);
+}
+.freeze-calendar button:focus-visible {
+  outline-offset: -3px;
+}
+.freeze-coverage {
+  border-left: 2px solid var(--freeze-ink);
+  padding-left: 10px;
+}
+.freeze-coverage p + p,
+.freeze-coverage strong + p {
+  margin-top: 6px;
+}
+.freeze-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.freeze-actions:empty {
+  display: none;
+}
+.freeze-periods {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0 0;
+}
+.freeze-periods li {
+  display: grid;
+  gap: 6px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
