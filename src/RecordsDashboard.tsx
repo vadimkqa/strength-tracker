@@ -1,3 +1,4 @@
+import { ProgressionTimeline } from './Progression';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Data } from './data';
 import { moveFavorite, toggleFavorite } from './record-preferences';
@@ -213,7 +214,19 @@ function ProgressChart({ record, now }: { record: ExerciseRecord; now: number })
     </section>
   );
 }
-function Detail({ record, now, back }: { record: ExerciseRecord; now: number; back: () => void }) {
+function Detail({
+  record,
+  now,
+  back,
+  data,
+  change,
+}: {
+  record: ExerciseRecord;
+  now: number;
+  back: () => void;
+  data: Data;
+  change: (fn: (d: Data) => Data) => void;
+}) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     heading.current?.focus({ preventScroll: true });
@@ -285,6 +298,12 @@ function Detail({ record, now, back }: { record: ExerciseRecord; now: number; ba
         tracked separately.
       </p>
       <ProgressChart key={record.id} record={record} now={now} />
+      <ProgressionTimeline
+        data={data}
+        id={record.id}
+        workoutIds={record.history.map((p) => p.workoutId)}
+        change={change}
+      />
       <section className="pr-rep-bests">
         <h2>Best performance by rep count</h2>
         <p className="muted">
@@ -383,7 +402,13 @@ export function RecordsDashboard({
       {selected && sessionControl}
       {selected ? (
         detail ? (
-          <Detail record={detail} now={now} back={() => setSelected(null)} />
+          <Detail
+            record={detail}
+            now={now}
+            back={() => setSelected(null)}
+            data={data}
+            change={change}
+          />
         ) : (
           <>
             <button onClick={() => setSelected(null)}>← All records</button>

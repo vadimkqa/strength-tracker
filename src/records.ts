@@ -63,7 +63,7 @@ export function savedIntensity(workout: Workout, exercise: Exercise): Performanc
   if (value === 'hard' || value === 'heavy') return 'hard';
   return 'unknown';
 }
-function completed(workout: Workout) {
+export function completedWorkout(workout: Workout) {
   return (
     Number.isFinite(workout.finished) &&
     !workout.cancelled &&
@@ -76,7 +76,9 @@ export function exerciseRecords(
   intensity: SessionFilter = 'all',
 ): ExerciseRecord[] {
   const groups = new Map<string, { name: string; names: Set<string>; history: Performance[] }>();
-  for (const w of [...workouts].filter(completed).sort((a, b) => a.finished! - b.finished!)) {
+  for (const w of [...workouts]
+    .filter(completedWorkout)
+    .sort((a, b) => a.finished! - b.finished!)) {
     for (const e of w.exercises) {
       if (e.skipped) continue;
       const session = savedIntensity(w, e);

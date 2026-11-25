@@ -8,6 +8,7 @@ export default defineConfig({
       ? [
           '**/mobile-reliability.spec.ts',
           '**/universal-import.spec.ts',
+          '**/progression.spec.ts',
           '**/set-input-navigation.spec.ts',
           '**/carousel-completion.spec.ts',
           '**/records.spec.ts',

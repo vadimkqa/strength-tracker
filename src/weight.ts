@@ -40,3 +40,18 @@ export function sumVolumes(values: number[]): number {
     return values.reduce((sum, v) => sum + v, 0);
   return Number(values.reduce((sum, v) => sum + BigInt(Math.round(v * 1000)), 0n)) / 1000;
 }
+
+/** Custom progression increments use the same integer-gram arithmetic as manual adjustments. */
+export function offsetWeight(
+  value: string,
+  increment: string,
+  direction: 1 | -1 = 1,
+): string | null {
+  const grams = milliWeight(value),
+    delta = milliWeight(increment);
+  if (grams === null || delta === null || delta <= 0n) return null;
+  const next = grams + BigInt(direction) * delta;
+  if (next < 0n) return null;
+  const result = fromMilli(next);
+  return weightValue(result) === null ? null : result;
+}
