@@ -1,3 +1,5 @@
+import { StreakFreezePanel, restRangeLabel } from './StreakFreezePanel';
+import { freezeStatus } from './streak-freeze';
 import { useState, useEffect } from 'react';
 import type { Data } from './data';
 import { currentProgram, programWeeks } from './programs';
@@ -8,7 +10,7 @@ import {
   configureStreak,
   STREAK_TIME_ZONE,
 } from './streak';
-import { WEEKDAYS } from './calendar';
+import { localDate, WEEKDAYS } from './calendar';
 import { scheduleMetadata } from './program-schedule';
 import { TrainingWeekCalendar } from './TrainingWeekCalendar';
 import { StreakIcon, SecretStreakIcon } from './StreakIcon';
@@ -53,6 +55,8 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
     setCustomDays(s.trainingDays?.[active?.id || ''] !== undefined);
     setDays(s.trainingDays?.[active?.id || ''] || goal?.goal.weekdays || []);
   }, [cycle, active?.id]);
+  const today = localDate(now, STREAK_TIME_ZONE);
+  const rest = s.freezes?.find((p) => !p.cancelled && freezeStatus(p, today) === 'Active');
   const level = levelFor(report.current),
     next = STREAK_LEVELS.find((l) => l.weeks > report.longest),
     secret = secretUnlocked(report.longest);
@@ -80,6 +84,17 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
           {report.current}
           <small>{report.current === 1 ? ' week' : ' weeks'}</small>
         </strong>
+        {rest && (
+          <div className="freeze-hero-status">
+            <strong>
+              <span className="freeze-flake" aria-hidden="true">
+                ❄{' '}
+              </span>
+              {current?.status === 'frozen' ? 'Streak protected' : 'Rest period active'}
+            </strong>
+            <small>{restRangeLabel(rest)}</small>
+          </div>
+        )}
         <p className="streak-longest">
           <span>Longest verified streak</span>
           <b data-testid="longest-streak">
@@ -107,6 +122,13 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
           <p className="streak-next-copy">All achievements are in your collection.</p>
         )}
       </section>
+      <StreakFreezePanel
+        data={data}
+        today={today}
+        weeks={report.weeks}
+        busy={busy}
+        change={change}
+      />
       <section className="card" aria-label="This week's streak progress">
         <p className="eyebrow">THIS WEEK · {current?.week || ''}</p>
         <h2>{goal?.goal.name || active?.name || 'Choose a program'}</h2>
@@ -116,9 +138,11 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
         <p className="muted">
           {current?.status === 'success'
             ? 'Week complete. Your streak has increased.'
-            : goal?.goal.target === null
-              ? 'Configure a weekly target below; none has been invented.'
-              : 'An unfinished current week does not break your streak.'}
+            : current?.status === 'frozen'
+              ? 'Streak protected this week. Any saved training days still count toward the weekly target.'
+              : goal?.goal.target === null
+                ? 'Configure a weekly target below; none has been invented.'
+                : 'An unfinished current week does not break your streak.'}
         </p>
         {last?.mode === 'scheduled' &&
           current?.goals.some((g) => g.goal.programId === active?.id && g.goal.showCycle) && (
@@ -320,9 +344,11 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
                     ? 'Complete'
                     : w.status === 'pending'
                       ? 'In progress'
-                      : w.status === 'failed'
-                        ? 'Missed'
-                        : 'Target unspecified'}
+                      : w.status === 'frozen'
+                        ? 'Frozen'
+                        : w.status === 'failed'
+                          ? 'Missed'
+                          : 'Target unspecified'}
                 </b>
               </summary>
               {(w.chosen ? [w.chosen] : []).map((g) => (
@@ -348,8 +374,8 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
           </button>
         )}
         <p className="muted">
-          Recent calendar weeks and all older recorded training weeks are retained. Empty calendar
-          gaps break the streak; their requirements are covered by saved schedule periods.
+          Recent calendar weeks and all older recorded training weeks are retained. Unprotected
+          calendar gaps break the streak; their requirements are covered by saved schedule periods.
         </p>
       </section>
       <details className="card">
@@ -362,7 +388,8 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
         <p className="muted">
           Completion date determines the Monday–Sunday week in Europe/Vienna. Meet the weekly target
           using any distinct dates, including rest days or make-ups. Rest days alone add no credit.
-          A missed past week breaks the streak; an unfinished current week preserves it.
+          A missed past week breaks the streak unless a confirmed rest period covers the full week.
+          Frozen weeks preserve the streak and add no qualifying weeks.
         </p>
         <p className="muted">
           Existing history is recalculated under these rules without changing records.{' '}

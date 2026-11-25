@@ -12,6 +12,7 @@ export default defineConfig({
           '**/set-input-navigation.spec.ts',
           '**/carousel-completion.spec.ts',
           '**/records.spec.ts',
+          '**/streak-freeze.spec.ts',
           '**/decimal-weights.spec.ts',
           '**/iphone-accessory.spec.ts',
         ]

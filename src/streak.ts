@@ -1,3 +1,11 @@
+import {
+  assertFreezes,
+  freezeCoverage,
+  mergeFreezes,
+  STREAK_TIME_ZONE,
+  type StreakFreeze,
+} from './streak-freeze';
+export { STREAK_TIME_ZONE } from './streak-freeze';
 import { localDate, calendarWeek, addDays, validTimeZone } from './calendar';
 export { localDate, calendarWeek, addDays, validTimeZone } from './calendar';
 import { scheduleMetadata } from './program-schedule';
@@ -136,6 +144,7 @@ export interface StreakAward {
 }
 export interface StreakState {
   rulesVersion?: 2;
+  freezes?: StreakFreeze[];
   trainingDays?: Record<string, number[]>;
   version: 1;
   timeZone: string;
@@ -146,8 +155,6 @@ export interface StreakState {
 }
 const distance = (a: string, b: string) =>
   (Date.parse(b + 'T12:00Z') - Date.parse(a + 'T12:00Z')) / 604800000;
-/** Fixed local calendar for training-day streaks, including DST. */
-export const STREAK_TIME_ZONE = 'Europe/Vienna';
 export function workoutStreakReason(w: Workout, now = Date.now()): string | null {
   if (
     w.streakExcluded === true ||
@@ -322,7 +329,7 @@ export interface WeekProgress {
   week: string;
   goals: GoalProgress[];
   chosen: GoalProgress | undefined;
-  status: 'success' | 'pending' | 'failed' | 'unconfigured';
+  status: 'success' | 'frozen' | 'pending' | 'failed' | 'unconfigured';
 }
 export interface StreakReport {
   current: number;
@@ -352,9 +359,31 @@ export function calculateStreak(data: Data, now = Date.now()): StreakReport {
     byWeek.get(key)!.add(date);
   }
   const records = [...s.weeks];
-  if (!records.some((w) => w.week === current)) {
+  const existing = new Set(records.map((w) => w.week));
+  const frozen = new Set<string>();
+  function includeWeek(week: string, policies: StreakPolicy[]) {
+    if (existing.has(week)) return;
+    const policy = policies.filter((p) => p.fromWeek <= week).at(-1) || policies[0];
+    records.push({ week, goals: policy ? [goalFor(policy, week)] : [] });
+    existing.add(week);
+  }
+  if (!existing.has(current)) {
     const p = s.policies.filter((p) => p.fromWeek <= current).at(-1);
     records.push({ week: current, goals: p ? [goalFor(p, current)] : [] });
+    existing.add(current);
+  }
+  for (const period of s.freezes || []) {
+    if (period.cancelled || period.start > current) continue;
+    const coverage = freezeCoverage(period);
+    for (
+      let week = coverage.protectedFrom;
+      week <= coverage.protectedThrough && week <= current;
+      week = addDays(week, 7)
+    ) {
+      frozen.add(week);
+      // Older empty weeks can be sparse in saved snapshots. A planned rest bridges only its own weeks.
+      includeWeek(week, s.policies);
+    }
   }
   const weeks = records
     .filter((w) => w.week <= current)
@@ -387,11 +416,13 @@ export function calculateStreak(data: Data, now = Date.now()): StreakReport {
           : goals.at(-1);
       const status = chosen?.success
         ? 'success'
-        : record.week === current
-          ? 'pending'
-          : chosen?.goal.target !== null && chosen?.goal.target !== undefined
-            ? 'failed'
-            : 'unconfigured';
+        : frozen.has(record.week)
+          ? 'frozen'
+          : record.week === current
+            ? 'pending'
+            : chosen?.goal.target !== null && chosen?.goal.target !== undefined
+              ? 'failed'
+              : 'unconfigured';
       return { week: record.week, goals, chosen, status } as WeekProgress;
     });
   let run = 0,
@@ -406,7 +437,7 @@ export function calculateStreak(data: Data, now = Date.now()): StreakReport {
       longest = Math.max(longest, run);
       for (const l of STREAK_LEVELS)
         if (l.weeks && run >= l.weeks && !earned[l.id]) earned[l.id] = w.week;
-    } else if (w.week !== current) run = 0;
+    } else if (w.status !== 'frozen' && w.week !== current) run = 0;
   }
   return {
     current: run,
@@ -630,6 +661,7 @@ export function assertStreak(value: unknown): asserts value is StreakState {
         !Object.values(s.trainingDays).every(validDays)))
   )
     throw Error('Invalid Strength Streak weekday settings.');
+  assertFreezes(s.freezes);
   const ids = new Set<string>();
   for (const p of s.policies) {
     if (
@@ -705,6 +737,8 @@ export function mergeStreaks(a?: StreakState, b?: StreakState): StreakState | un
   next.rulesVersion = 2;
   next.trainingDays = { ...a.trainingDays, ...b.trainingDays };
   next.targets = { ...a.targets, ...b.targets };
+  const freezes = mergeFreezes(a.freezes, b.freezes);
+  if (freezes) next.freezes = freezes;
   for (const p of b.policies) {
     const old = next.policies.find((x) => x.id === p.id);
     if (old && JSON.stringify(old) !== JSON.stringify(p))
