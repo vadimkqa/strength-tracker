@@ -125,6 +125,7 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
       <StreakFreezePanel
         data={data}
         today={today}
+        now={now}
         weeks={report.weeks}
         busy={busy}
         change={change}
@@ -388,8 +389,9 @@ export function StreakDashboard({ data, now, busy, change }: Props) {
         <p className="muted">
           Completion date determines the Monday–Sunday week in Europe/Vienna. Meet the weekly target
           using any distinct dates, including rest days or make-ups. Rest days alone add no credit.
-          A missed past week breaks the streak unless a confirmed rest period covers the full week.
-          Frozen weeks preserve the streak and add no qualifying weeks.
+          A rest period can protect a missed week when it covers the full week or accounts for the
+          remaining target and every unfinished scheduled training day. Frozen weeks preserve the
+          streak and add no qualifying weeks.
         </p>
         <p className="muted">
           Existing history is recalculated under these rules without changing records.{' '}

@@ -33,12 +33,10 @@ test('selects and highlights an inclusive range across months, shows partial wee
   await expect(
     panel.getByRole('button', { name: 'Tuesday, December 1, 2026', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
+  await expect(panel.getByRole('status')).toContainText('3 weeks affected · 2 weeks protected');
+  await expect(panel.getByRole('status')).toContainText('Nov 23, 2026 – Nov 29, 2026');
   await expect(panel.getByRole('status')).toContainText(
-    '3 calendar weeks affected · 2 fully covered',
-  );
-  await expect(panel.getByRole('status')).toContainText('Nov 23, 2026 – Dec 6, 2026');
-  await expect(panel.getByRole('status')).toContainText(
-    'Partial weeks keep their normal training target',
+    'Unfinished training outside the range: Nov 16, 2026',
   );
   await pick(page, 'Previous month');
   await expect(
@@ -122,7 +120,7 @@ test('protects an active week without adding credit, then recalculates on early 
     'Streak protected',
   );
   await expect(page.getByTestId('weekly-progress')).toHaveText('2 / 3');
-  await expect(freeze(page)).toContainText('2 full weeks covered');
+  await expect(freeze(page)).toContainText('2 weeks protected');
   await scrollTo(page, '.streak-hero');
   await page.screenshot({
     path: 'test-results/streak-freeze-active-iphone.png',
@@ -134,7 +132,7 @@ test('protects an active week without adding credit, then recalculates on early 
     animations: 'disabled',
   });
   await pick(page, 'End after today');
-  await expect(freeze(page)).toContainText('No full weeks covered');
+  await expect(freeze(page)).toContainText('Unfinished training outside the range: Nov 11, 2026');
   await pick(page, 'Confirm early end');
   const saved = await stored(page);
   expect(saved.streak.freezes[0].end).toBe('2026-11-10');
@@ -147,4 +145,57 @@ test('protects an active week without adding credit, then recalculates on early 
   await openStreak(page);
   await expect(page.getByLabel('Current streak', { exact: true })).toHaveText('0 weeks');
   await expect(freeze(page)).toContainText('Previous');
+});
+
+test('on Thursday, select Tuesday retroactively and extend the active period backward', async ({
+  page,
+}) => {
+  const initial = streakData();
+  await seedStreak(page, initial);
+  await page.clock.setSystemTime(Date.parse('2026-11-12T12:00Z'));
+  await openStreak(page);
+  await pick(page, 'Plan rest period');
+  const panel = freeze(page);
+  const day = (name: string) => panel.getByRole('button', { name, exact: true });
+  await expect(day('Sunday, November 8, 2026')).toBeEnabled();
+  await expect(day('Sunday, October 25, 2026')).toHaveCount(0);
+  await pick(page, 'Previous month');
+  await expect(day('Sunday, October 25, 2026')).toBeDisabled();
+  await expect(day('Monday, October 26, 2026')).toBeEnabled();
+  await pick(page, 'Next month');
+  await expect(day('Tuesday, November 10, 2026')).toHaveAttribute('data-day', 'past');
+  await expect(day('Thursday, November 12, 2026')).toHaveAttribute('aria-current', 'date');
+  await expect(day('Sunday, November 15, 2026')).toHaveAttribute('data-day', 'future');
+  await pick(page, 'Tuesday, November 10, 2026');
+  await pick(page, 'Sunday, November 15, 2026');
+  const summary = panel.getByRole('status');
+  await expect(summary).toContainText('Selected rest dates: Nov 10, 2026 – Nov 15, 2026');
+  await expect(summary).toContainText('Nov 9, 2026 – Nov 15, 2026');
+  await expect(summary).toContainText('Scheduled days covered: Nov 10, 2026, Nov 11, 2026');
+  await expect(summary).toContainText('1 week affected · 1 week protected');
+  await pick(page, 'Review rest period');
+  await pick(page, 'Confirm rest period');
+  const id = (await stored(page)).streak.freezes[0].id;
+  await expect(page.getByRole('region', { name: 'Current Strength Streak' })).toContainText(
+    'Streak protected',
+  );
+  await pick(page, 'Edit dates');
+  await pick(page, 'Monday, November 9, 2026');
+  // Editing only the start keeps the existing end selected.
+  await expect(summary).toContainText('Selected rest dates: Nov 9, 2026 – Nov 15, 2026');
+  await pick(page, 'Review rest period');
+  await pick(page, 'Confirm rest period');
+  const saved = await stored(page);
+  expect(saved.streak.freezes[0]).toMatchObject({ id, start: '2026-11-09', end: '2026-11-15' });
+  expect(saved.history).toEqual(initial.history);
+  await page.reload();
+  await openStreak(page);
+  await expect(panel).toContainText('Nov 9, 2026 – Nov 15, 2026');
+  await pick(page, 'Cancel rest period');
+  await expect(panel).toContainText('Removing protection can break your streak');
+  await pick(page, 'Confirm cancellation');
+  await expect(page.getByRole('region', { name: 'Current Strength Streak' })).not.toContainText(
+    'Streak protected',
+  );
+  expect((await stored(page)).history).toEqual(initial.history);
 });

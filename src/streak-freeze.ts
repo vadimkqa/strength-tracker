@@ -15,18 +15,40 @@ export interface StreakFreeze extends RestRange {
 export type FreezeChange =
   { type: 'save'; range: RestRange; id?: string } | { type: 'cancel' | 'end'; id: string };
 
-export function freezeCoverage(range: RestRange) {
-  const first = monday(range.start);
-  const last = monday(range.end);
-  const protectedFrom = first === range.start ? first : addDays(first, 7);
-  const protectedThrough = addDays(last, 6) <= range.end ? last : addDays(last, -7);
-  const weeks = (a: string, b: string) =>
-    Math.max(0, Math.round((Date.parse(b) - Date.parse(a)) / 604800000) + 1);
+/** The current Vienna week and the two preceding calendar weeks are selectable. */
+export const earliestRestDate = (today: string) => addDays(monday(today), -14);
+
+export function* restWeeks(range: RestRange, through = monday(range.end)) {
+  for (
+    let week = monday(range.start);
+    week <= range.end && week <= through;
+    week = addDays(week, 7)
+  )
+    yield week;
+}
+
+export function freezeWeekCoverage(
+  range: RestRange,
+  week: string,
+  days: readonly { date: string; scheduled: boolean | null; complete: boolean }[] = [],
+  target: number | null = null,
+) {
+  const full = range.start <= week && range.end >= addDays(week, 6);
+  const planned = days.filter((day) => day.scheduled === true);
+  const covered = planned.filter((day) => day.date >= range.start && day.date <= range.end);
+  const uncovered = planned.filter((day) => !day.complete && !covered.includes(day));
+  const completed = days.filter((day) => day.complete).length;
+  const scheduleKnown = planned.length > 0 && target !== null;
+  const remaining =
+    target === null
+      ? null
+      : Math.max(0, target - completed - covered.filter((day) => !day.complete).length);
   return {
-    touched: weeks(first, last),
-    protected: weeks(protectedFrom, protectedThrough),
-    protectedFrom,
-    protectedThrough,
+    covered,
+    uncovered,
+    scheduleKnown,
+    remaining,
+    protected: full || (scheduleKnown && uncovered.length === 0 && remaining === 0),
   };
 }
 
@@ -49,16 +71,23 @@ export function updateFreezes(periods: readonly StreakFreeze[], action: FreezeCh
   const updatedAt = Math.max(now, (old?.updatedAt ?? -1) + 1);
   let next: StreakFreeze;
   if (action.type === 'save') {
-    if (action.id && (!old || old.start <= today))
-      throw Error('Only upcoming rest periods can be edited.');
+    const earliest = earliestRestDate(today);
+    if (action.id && (!old || old.end < earliest))
+      throw Error('This rest period is outside the editable date window.');
     const { start, end } = action.range;
-    if (!validDate(start) || !validDate(end) || end < start || start < today)
-      throw Error('Select an inclusive date range starting today or later in Europe/Vienna.');
+    // A long-running period can keep its original start when its end is edited.
+    if (
+      !validDate(start) ||
+      !validDate(end) ||
+      end < start ||
+      end < earliest ||
+      (start < earliest && start !== old?.start)
+    )
+      throw Error('Choose dates in the current or previous two Europe/Vienna weeks, or later.');
     next = { id: old?.id ?? crypto.randomUUID(), start, end, updatedAt };
   } else {
     if (!old) throw Error('This rest period is no longer available.');
     if (action.type === 'cancel') {
-      if (old.start <= today) throw Error('Only upcoming rest periods can be cancelled.');
       next = { ...old, cancelled: true, updatedAt };
     } else {
       if (old.start > today || old.end <= today)

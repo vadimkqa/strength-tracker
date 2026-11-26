@@ -1,6 +1,8 @@
 import {
   assertFreezes,
-  freezeCoverage,
+  freezeWeekCoverage,
+  restWeeks,
+  type RestRange,
   mergeFreezes,
   STREAK_TIME_ZONE,
   type StreakFreeze,
@@ -339,6 +341,53 @@ export interface StreakReport {
   earned: Record<string, string>;
   ignored: number;
 }
+function goalProgress(
+  raw: WeekGoal,
+  entries: SavedProgram[],
+  week: string,
+  dates: string[],
+  now: number,
+): GoalProgress {
+  const days = goalWeekdays(raw, entries);
+  const target =
+    raw.weekdays === undefined && raw.mode === 'scheduled' && days?.length
+      ? days.length
+      : raw.target;
+  const goal = {
+    ...raw,
+    weekdays: days,
+    target: target !== null && target >= 1 && target <= 7 ? target : null,
+  };
+  return {
+    goal,
+    completed: goal.target === null ? dates.length : Math.min(goal.target, dates.length),
+    success: goal.target !== null && dates.length >= goal.target,
+    sessions: dates.map((date) => ({ name: date, complete: true })),
+    days: weekCalendar(week, days, dates, now),
+  };
+}
+
+export function previewRestPeriod(
+  data: Data,
+  range: RestRange,
+  weeks: ReadonlyMap<string, WeekProgress>,
+  now: number,
+) {
+  const entries = data.programs || migratePrograms(data).programs!;
+  return [...restWeeks(range)].map((week) => {
+    let chosen = weeks.get(week)?.chosen;
+    if (!weeks.has(week)) {
+      const policy = data.streak?.policies.filter((p) => p.fromWeek <= week).at(-1);
+      if (policy) chosen = goalProgress(goalFor(policy, week), entries, week, [], now);
+    }
+    return {
+      week,
+      success: !!chosen?.success,
+      ...freezeWeekCoverage(range, week, chosen?.days, chosen?.goal.target),
+    };
+  });
+}
+
 export function calculateStreak(data: Data, now = Date.now()): StreakReport {
   const s = data.streak;
   if (!s)
@@ -360,29 +409,23 @@ export function calculateStreak(data: Data, now = Date.now()): StreakReport {
   }
   const records = [...s.weeks];
   const existing = new Set(records.map((w) => w.week));
-  const frozen = new Set<string>();
-  function includeWeek(week: string, policies: StreakPolicy[]) {
+  const restByWeek = new Map<string, StreakFreeze[]>();
+  const today = localDate(now, STREAK_TIME_ZONE);
+  function includeWeek(week: string, policy?: StreakPolicy) {
     if (existing.has(week)) return;
-    const policy = policies.filter((p) => p.fromWeek <= week).at(-1) || policies[0];
     records.push({ week, goals: policy ? [goalFor(policy, week)] : [] });
     existing.add(week);
   }
-  if (!existing.has(current)) {
-    const p = s.policies.filter((p) => p.fromWeek <= current).at(-1);
-    records.push({ week: current, goals: p ? [goalFor(p, current)] : [] });
-    existing.add(current);
-  }
+  includeWeek(current, s.policies.filter((p) => p.fromWeek <= current).at(-1));
   for (const period of s.freezes || []) {
-    if (period.cancelled || period.start > current) continue;
-    const coverage = freezeCoverage(period);
-    for (
-      let week = coverage.protectedFrom;
-      week <= coverage.protectedThrough && week <= current;
-      week = addDays(week, 7)
-    ) {
-      frozen.add(week);
-      // Older empty weeks can be sparse in saved snapshots. A planned rest bridges only its own weeks.
-      includeWeek(week, s.policies);
+    if (period.cancelled || period.start > today) continue;
+    for (const week of restWeeks(period, current)) {
+      const ranges = restByWeek.get(week) || [];
+      ranges.push(period);
+      restByWeek.set(week, ranges);
+      // Older weeks can be sparse. Use only a policy that was in force for that week.
+      if (!existing.has(week))
+        includeWeek(week, s.policies.filter((p) => p.fromWeek <= week).at(-1));
     }
   }
   const weeks = records
@@ -390,33 +433,21 @@ export function calculateStreak(data: Data, now = Date.now()): StreakReport {
     .sort((a, b) => a.week.localeCompare(b.week))
     .map((record) => {
       const dates = [...(byWeek.get(record.week) || [])].sort();
-      const goals = record.goals.map((raw) => {
-        const days = goalWeekdays(raw, entries);
-        const target =
-          raw.weekdays === undefined && raw.mode === 'scheduled' && days?.length
-            ? days.length
-            : raw.target;
-        const goal = {
-          ...raw,
-          weekdays: days,
-          target: target !== null && target >= 1 && target <= 7 ? target : null,
-        };
-        return {
-          goal,
-          completed: goal.target === null ? dates.length : Math.min(goal.target, dates.length),
-          success: goal.target !== null && dates.length >= goal.target,
-          sessions: dates.map((date) => ({ name: date, complete: true })),
-          days: weekCalendar(record.week, days, dates, now),
-        };
-      });
+      const goals = record.goals.map((raw) => goalProgress(raw, entries, record.week, dates, now));
       const chosen =
         record.week === current
           ? [...goals].reverse().find((g) => g.goal.programId === data.activeProgramId) ||
             goals.at(-1)
           : goals.at(-1);
+      const frozen = restByWeek
+        .get(record.week)
+        ?.some(
+          (range) =>
+            freezeWeekCoverage(range, record.week, chosen?.days, chosen?.goal.target).protected,
+        );
       const status = chosen?.success
         ? 'success'
-        : frozen.has(record.week)
+        : frozen
           ? 'frozen'
           : record.week === current
             ? 'pending'
