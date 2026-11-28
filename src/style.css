@@ -3667,13 +3667,17 @@ html[data-workout-keyboard='true'] .live-set-controls button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
-.freeze-endpoints > div {
+.freeze-endpoints > button {
   display: grid;
   gap: 4px;
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px;
   min-width: 0;
+  text-align: left;
+}
+.freeze-endpoints > button[aria-pressed='true'] {
+  border-color: var(--freeze-ink);
 }
 .freeze-month {
   display: flex;
@@ -3745,4 +3749,40 @@ html[data-workout-keyboard='true'] .live-set-controls button {
   gap: 6px;
   padding: 12px 0;
   border-top: 1px solid var(--border);
+}
+
+.freeze-calendar button[data-day='past']:not([aria-pressed='true']) {
+  color: var(--muted);
+  text-decoration: underline dotted;
+  text-underline-offset: 4px;
+}
+.freeze-calendar button[aria-current='date'] {
+  box-shadow: inset 0 0 0 1px var(--purple);
+  border-radius: 8px;
+}
+.freeze-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+.freeze-key span:first-child {
+  text-decoration: underline dotted;
+  text-underline-offset: 4px;
+}
+.freeze-key span:nth-child(2) {
+  color: var(--freeze-ink);
+  font-weight: 700;
+}
+.freeze-review-weeks {
+  padding: 0;
+  margin: 6px 0;
+  list-style: none;
+}
+.freeze-review-weeks li {
+  display: grid;
+  gap: 3px;
+  padding: 7px 0;
+}
+.freeze-review-weeks small {
+  color: var(--muted);
 }
